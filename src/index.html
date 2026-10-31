@@ -1,0 +1,1364 @@
+<title>知识脉络图</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* 布局：全屏 3D 场景为主体，左侧层级树、右侧详情、底部非线性时间轴叠放在场景四周 */
+:root {
+  --bg: #060912;
+  --bg-2: #0b1122;
+  --panel: rgba(8, 12, 25, 0.9);
+  --line: #1c2744;
+  --line-2: #2a385f;
+  --fg: #e6ebfa;
+  --fg-2: #c3cbe4;
+  --muted: #8a96ba;
+  --faint: #56618a;
+  --accent: #7cc4ff;
+  --tech: #38bdf8;
+  --econ: #fb923c;
+  --soc: #a78bfa;
+  --k-tech: #5eead4;
+  --k-cap: #facc15;
+  --k-policy: #fb7185;
+  --k-idea: #e2e8f0;
+  --f-display: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+  --f-body: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --f-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--f-body);
+  overflow: hidden; -webkit-font-smoothing: antialiased;
+}
+* { box-sizing: border-box; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.app {
+  height: 100%; display: grid;
+  grid-template-columns: 236px minmax(0, 1fr) 380px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas: "top top top" "tree stage panel" "time time time";
+}
+
+/* ---------- 顶栏 ---------- */
+.top {
+  grid-area: top; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding-block: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  border-bottom: 1px solid var(--line); background: var(--bg-2); position: relative; z-index: 5;
+}
+.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.brand h1 { font-family: var(--f-display); font-size: 19px; margin: 0; letter-spacing: 1px; white-space: nowrap; }
+.brand .sub { color: var(--muted); font-size: 12px; font-family: var(--f-mono); white-space: nowrap; }
+.search { position: relative; flex: 1 1 220px; max-width: 320px; min-width: 160px; }
+.search input {
+  width: 100%; height: 32px; border-radius: 16px; border: 1px solid var(--line-2);
+  background: #0d1530; color: var(--fg); padding: 0 14px 0 32px; font: inherit; font-size: 13px;
+}
+.search input::placeholder { color: var(--faint); }
+.search svg { position: absolute; left: 11px; top: 9px; }
+.results {
+  position: absolute; top: 38px; left: 0; right: 0; background: #0b1226; border: 1px solid var(--line-2);
+  border-radius: 10px; max-height: 360px; overflow: auto; z-index: 20; box-shadow: 0 12px 40px rgba(0,0,0,.5);
+}
+.results button {
+  display: block; width: 100%; text-align: left; background: none; border: 0; padding: 8px 12px;
+  border-bottom: 1px solid var(--line); cursor: pointer;
+}
+.results button:hover, .results button:focus-visible { background: #14204a; }
+.results .r-t { font-size: 13px; }
+.results .r-m { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 8px; overflow: hidden; }
+.seg button { background: transparent; border: 0; padding: 6px 11px; font-size: 12px; color: var(--muted); cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line-2); }
+.seg button[aria-pressed="true"] { background: rgba(124,196,255,.16); color: #fff; }
+.legend { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.legend button {
+  display: inline-flex; align-items: center; gap: 6px; background: transparent; border: 1px solid var(--line-2);
+  border-radius: 14px; padding: 4px 10px; font-size: 11.5px; color: var(--fg-2); cursor: pointer;
+}
+.legend button[aria-pressed="false"] { opacity: .35; }
+.legend i { width: 16px; height: 2px; display: inline-block; border-radius: 1px; }
+.icon-btn { display: none; background: transparent; border: 1px solid var(--line-2); border-radius: 8px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
+
+/* ---------- 左侧层级树 ---------- */
+.tree {
+  grid-area: tree; overflow: auto; border-right: 1px solid var(--line); background: var(--panel);
+  padding: 14px 12px 20px max(16px, env(safe-area-inset-left, 0px)); position: relative; z-index: 3;
+}
+.eyebrow { font-size: 11px; color: var(--muted); letter-spacing: 1.5px; margin: 0 0 10px; }
+.cat { margin-bottom: 12px; }
+.cat-h, .sub-h, .dom {
+  display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: 0; text-align: left;
+  cursor: pointer; padding: 3px 4px; border-radius: 5px;
+}
+.cat-h { font-weight: 700; font-size: 14px; }
+.sub-h { font-size: 12.5px; color: var(--fg-2); padding-left: 14px; }
+.dom { font-size: 12.5px; color: var(--muted); padding-left: 28px; }
+.dom:hover, .sub-h:hover, .cat-h:hover { background: rgba(255,255,255,.04); }
+.dom.on { color: #fff; font-weight: 500; }
+.dom .cnt { margin-left: auto; font-family: var(--f-mono); font-size: 10.5px; color: var(--faint); }
+.chk { width: 11px; height: 11px; border-radius: 3px; border: 1.5px solid currentColor; flex: none; }
+.chk.full { background: currentColor; }
+.chk.part { background: linear-gradient(135deg, currentColor 50%, transparent 50%); }
+.tree .hint { font-size: 11px; color: var(--faint); line-height: 1.6; margin-top: 8px; }
+
+/* ---------- 场景 ---------- */
+.stage { grid-area: stage; position: relative; overflow: hidden; min-width: 0; }
+.stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.lb { position: absolute; left: 0; top: 0; white-space: nowrap; will-change: transform; font-size: 11px; line-height: 1; }
+.lb.dom-l {
+  font-size: 12px; font-weight: 700; padding: 4px 8px; border-radius: 5px;
+  background: rgba(8,12,25,.82); border: 1px solid var(--c); color: #f2f5ff;
+}
+.lb.cat-l { font-family: var(--f-display); font-size: 17px; letter-spacing: 3px; color: var(--c); text-shadow: 0 0 12px rgba(0,0,0,.9); }
+.lb.sub-l { font-size: 11.5px; color: var(--c); opacity: .9; letter-spacing: 1px; }
+.lb.node-l { color: #e4e9ff; text-shadow: 0 0 4px #000, 0 0 8px #000; font-size: 11px; }
+.lb.node-l b { font-family: var(--f-mono); font-weight: 600; color: var(--c); margin-right: 4px; font-size: 10.5px; }
+.lb.node-l.w3 { font-size: 12px; font-weight: 500; }
+.lb.link-l {
+  padding: 4px 9px; border-radius: 10px; background: rgba(8,12,25,.86); border: 1px solid var(--c);
+  color: var(--c); font-size: 11px;
+}
+.lb.link-l.sel { border-width: 2px; font-weight: 700; font-size: 12px; }
+.lb.tick-l { font-family: var(--f-mono); font-size: 10.5px; color: var(--muted); }
+.lb.era-l { font-size: 11px; color: var(--faint); letter-spacing: 2px; }
+.lb.shock-l { font-size: 11px; color: #fda4af; }
+.lb.cut-l { font-family: var(--f-mono); font-size: 13px; color: var(--accent); font-weight: 600; }
+.tip {
+  position: absolute; pointer-events: none; z-index: 6; max-width: 280px; padding: 10px 12px;
+  background: rgba(10,15,32,.96); border: 1px solid var(--line-2); border-radius: 8px; font-size: 12px; line-height: 1.55;
+  box-shadow: 0 10px 30px rgba(0,0,0,.5);
+}
+.tip .t-y { font-family: var(--f-mono); color: var(--muted); font-size: 11px; }
+.tip .t-t { font-weight: 700; font-size: 13px; margin: 2px 0 4px; }
+.tip .t-x { color: var(--fg-2); }
+.hud { position: absolute; left: 14px; bottom: 12px; font-size: 11px; color: var(--faint); pointer-events: none; }
+.zoom { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
+.zoom button {
+  width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line-2); background: rgba(10,15,32,.85);
+  cursor: pointer; font-size: 16px; color: var(--fg-2);
+}
+.lb.lane-l { font-size: 13px; font-weight: 700; letter-spacing: 2px; padding: 5px 10px; border-radius: 6px; background: rgba(8,12,25,.85); border: 1px solid var(--c); color: var(--c); }
+.lb.stg-l { font-size: 11px; color: var(--c); opacity: .85; letter-spacing: 1px; }
+.lb.bar-l { color: #e4e9ff; text-shadow: 0 0 4px #000, 0 0 8px #000; font-size: 11px; }
+.lb.bar-l b { font-family: var(--f-mono); font-weight: 400; color: var(--c); margin-left: 4px; font-size: 10px; }
+.lb.bar-l.w3 { font-size: 12px; font-weight: 500; }
+.lb.xl-l { font-size: 11px; color: var(--fg-2); text-shadow: 0 0 4px #000, 0 0 8px #000; }
+.lb.xl-l em { font-style: normal; font-weight: 700; color: var(--c); }
+.lb.dom-l .xp { color: var(--c); font-weight: 400; margin-left: 2px; }
+.back { display: inline-flex; align-items: center; gap: 6px; background: rgba(124,196,255,.14); border: 1px solid var(--accent); color: #fff; border-radius: 8px; padding: 6px 12px; font-size: 12.5px; cursor: pointer; }
+.brand .dname { font-family: var(--f-display); font-size: 19px; color: var(--c); white-space: nowrap; }
+.enter { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; margin-top: 14px; padding: 11px 14px; border-radius: 9px; border: 1px solid var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); color: #fff; cursor: pointer; font-size: 14px; font-weight: 700; text-align: left; }
+.enter small { font-weight: 400; color: var(--fg-2); font-size: 11.5px; }
+.enter:hover { background: color-mix(in srgb, var(--c) 24%, transparent); }
+.sides { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.side { border: 1px solid var(--line-2); border-radius: 8px; padding: 9px 10px; font-size: 12.5px; line-height: 1.6; }
+.side b { display: block; font-size: 11px; color: var(--muted); letter-spacing: 1px; margin-bottom: 3px; }
+.side:first-child { border-color: color-mix(in srgb, #f9a8d4 55%, transparent); }
+.side:last-child { border-color: color-mix(in srgb, #7dd3fc 55%, transparent); }
+.lanekey { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--fg-2); margin-top: 12px; }
+.note { font-size: 12.5px; color: var(--muted); line-height: 1.7; border: 1px dashed var(--line-2); border-radius: 8px; padding: 10px 12px; margin-top: 14px; }
+.loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; }
+
+/* ---------- 右侧详情 ---------- */
+.panel {
+  grid-area: panel; overflow: auto; border-left: 1px solid var(--line); background: var(--panel);
+  padding: 18px max(20px, env(safe-area-inset-right, 0px)) 28px 22px; position: relative; z-index: 3;
+}
+.panel .crumb { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); letter-spacing: 1.5px; }
+.panel .close { margin-left: auto; background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 13px; padding: 2px 6px; }
+.panel h2 { font-family: var(--f-display); font-size: 22px; line-height: 1.35; margin: 10px 0 8px; text-wrap: balance; }
+.panel h2 .yr { font-family: var(--f-mono); font-weight: 600; font-size: 18px; color: var(--muted); margin-right: 8px; }
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12.5px; }
+.pill { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 11px; border: 1px solid var(--c); color: var(--c); font-size: 11.5px; background: color-mix(in srgb, var(--c) 12%, transparent); }
+.dlink { background: none; border: 0; padding: 0; cursor: pointer; color: var(--c); font-size: 13px; font-weight: 500; }
+.dlink:hover { text-decoration: underline; }
+.lede { color: var(--fg-2); font-size: 13.5px; line-height: 1.75; margin: 12px 0 0; }
+.sec { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 14px; }
+.sec h3 { font-size: 11.5px; letter-spacing: 1.5px; color: var(--muted); margin: 0 0 8px; font-weight: 700; }
+.sec p { margin: 0; font-size: 13.5px; line-height: 1.75; color: var(--fg); }
+.trio { display: grid; gap: 12px; }
+.trio h4 { margin: 0 0 3px; font-size: 11.5px; color: var(--muted); font-weight: 500; letter-spacing: 1px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 12px; padding: 4px 9px; border-radius: 5px; border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); background: color-mix(in srgb, var(--c) 9%, transparent); color: var(--fg); }
+.list { display: grid; gap: 2px; }
+.row {
+  display: grid; grid-template-columns: 42px minmax(0,1fr) auto; gap: 8px; align-items: baseline;
+  background: none; border: 0; text-align: left; padding: 6px 6px; border-radius: 6px; cursor: pointer; width: 100%;
+}
+.row:hover { background: rgba(255,255,255,.05); }
+.row .y { font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); }
+.row .tt { font-size: 13px; min-width: 0; }
+.row .tt small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+.row .rt { font-size: 11px; color: var(--faint); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin-right: 6px; vertical-align: 1px; }
+.stages { display: grid; gap: 4px; }
+.stg { display: grid; grid-template-columns: 84px minmax(0,1fr) 40px; gap: 8px; align-items: center; font-size: 12.5px; }
+.stg .y { font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
+.heat { display: flex; gap: 3px; justify-content: flex-end; }
+.heat i { width: 7px; height: 7px; border-radius: 2px; background: var(--line-2); }
+.heat i.on { background: var(--c); }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; }
+.stat { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.stat b { display: block; font-family: var(--f-mono); font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 11px; color: var(--muted); }
+.bars { display: grid; gap: 5px; }
+.bar { display: grid; grid-template-columns: 86px minmax(0,1fr) 26px; gap: 8px; align-items: center; font-size: 12px; background: none; border: 0; padding: 2px 0; cursor: pointer; text-align: left; }
+.bar .tr { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.bar .tr i { display: block; height: 100%; background: var(--c); border-radius: 4px; }
+.bar .n { font-family: var(--f-mono); font-size: 11px; color: var(--muted); text-align: right; }
+.nav2 { display: flex; gap: 8px; margin-top: 18px; }
+.nav2 button { flex: 1; background: transparent; border: 1px solid var(--line-2); border-radius: 8px; padding: 8px; font-size: 12px; color: var(--fg-2); cursor: pointer; }
+.nav2 button:hover { border-color: var(--accent); color: #fff; }
+.how { font-size: 12.5px; color: var(--fg-2); line-height: 1.8; margin: 10px 0 0; padding-left: 18px; }
+.chart text { font-family: var(--f-mono); font-size: 9.5px; fill: var(--faint); }
+
+/* ---------- 底部时间轴 ---------- */
+.time {
+  grid-area: time; border-top: 1px solid var(--line); background: var(--bg-2);
+  padding-block: 10px 12px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; grid-template-columns: 150px minmax(0,1fr); gap: 16px; align-items: center;
+}
+.time .lab { font-size: 12px; color: var(--fg-2); }
+.time .lab b { display: block; font-family: var(--f-mono); font-size: 18px; color: var(--accent); font-weight: 600; }
+.track { position: relative; height: 44px; }
+.eras { position: absolute; left: 0; right: 0; top: 0; height: 20px; }
+.era { position: absolute; top: 0; height: 20px; border-radius: 3px; font-size: 10.5px; color: var(--muted); display: grid; place-items: center; overflow: hidden; white-space: nowrap; }
+.era:nth-child(odd) { background: #141d38; }
+.era:nth-child(even) { background: #1a2546; }
+.ticks { position: absolute; left: 0; right: 0; top: 26px; height: 14px; }
+.ticks span { position: absolute; transform: translateX(-50%); font-family: var(--f-mono); font-size: 10px; color: var(--faint); }
+.track input[type=range] { position: absolute; left: 0; right: 0; top: -2px; width: 100%; height: 24px; margin: 0; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer; }
+.track input[type=range]::-webkit-slider-runnable-track { height: 24px; background: transparent; }
+.track input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 4px; height: 24px; background: var(--accent); border-radius: 2px; box-shadow: 0 0 10px var(--accent); }
+.track input[type=range]::-moz-range-thumb { width: 4px; height: 24px; background: var(--accent); border: 0; border-radius: 2px; }
+.track .past { position: absolute; top: 0; height: 20px; left: 0; background: rgba(124,196,255,.10); border-right: 0; pointer-events: none; border-radius: 3px; }
+
+@media (max-width: 1100px) {
+  .app { grid-template-columns: 200px minmax(0, 1fr) 330px; }
+  .legend { margin-left: 0; }
+}
+@media (max-width: 860px) {
+  .app { grid-template-columns: minmax(0,1fr); grid-template-rows: auto minmax(0, 1fr) auto auto; grid-template-areas: "top" "stage" "panel" "time"; }
+  .icon-btn { display: inline-block; }
+  .tree { position: fixed; left: 0; top: 0; bottom: 0; width: 260px; z-index: 30; transform: translateX(-102%); transition: transform .25s; padding-top: max(16px, env(safe-area-inset-top, 0px)); }
+  .tree.open { transform: none; box-shadow: 10px 0 40px rgba(0,0,0,.6); }
+  .app { grid-template-rows: auto minmax(52vh, 1fr) auto auto; }
+  .legend { flex-wrap: nowrap; overflow-x: auto; }
+  .legend button { flex: none; }
+  .brand .sub { display: none; }
+  .panel { max-height: 34vh; border-left: 0; border-top: 1px solid var(--line); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .legend { width: 100%; order: 4; }
+  .search { max-width: none; order: 3; flex-basis: 100%; }
+  .time { grid-template-columns: 70px minmax(0,1fr); gap: 10px; }
+  .time .lab span { display: none; }
+  .hud { display: none; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tree { transition: none; }
+}
+</style>
+
+<div class="app">
+  <header class="top">
+    <button class="icon-btn" id="treeBtn" aria-controls="tree" aria-expanded="false">层级</button>
+    <button class="back" id="backBtn" data-go="exit" hidden>← 返回全局</button>
+    <div class="brand"><h1>知识脉络图</h1><span class="dname" id="brandDom" hidden></span><span class="sub" id="brandSub">1760 — 2026</span></div>
+    <div class="search">
+      <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5.5" fill="none" stroke="#56618a" stroke-width="1.6"/><path d="M11 11l4 4" stroke="#56618a" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <input id="q" type="search" placeholder="搜索节点、人物、书籍、事件" autocomplete="off" aria-label="搜索">
+      <div class="results" id="results" hidden></div>
+    </div>
+    <div class="seg" role="group" aria-label="视角">
+      <button id="v3d" aria-pressed="true">3D 透视</button><button id="vtop" aria-pressed="false">俯视</button><button id="vfront" aria-pressed="false">时间正视</button>
+    </div>
+    <div class="seg" role="group" aria-label="标注密度">
+      <button id="mKey" aria-pressed="true">仅关键点</button><button id="mAll" aria-pressed="false">全部标注</button>
+    </div>
+    <div class="legend" id="legend" aria-label="连线类型筛选"></div>
+  </header>
+
+  <nav class="tree" id="tree" aria-label="大类、小类与领域">
+    <p class="eyebrow">大类 › 小类 › 领域</p>
+    <div id="treeBody"></div>
+    <p class="hint">点名称查看详情，点色块切换显示。<br>右侧数字是跨领域连线数，⤢ 表示已有细节（著作、人物、思想、辩论）。</p>
+  </nav>
+
+  <main class="stage" id="stage">
+    <div class="loading" id="loading">正在载入 3D 场景…</div>
+    <div class="labels" id="labels"></div>
+    <div class="tip" id="tip" hidden></div>
+    <div class="hud" id="hud">拖拽旋转 · 右键平移 · 滚轮缩放 · 点击查看详情 · 双击光柱进入领域视图</div>
+    <div class="zoom"><button id="zin" aria-label="放大">+</button><button id="zout" aria-label="缩小">−</button><button id="zreset" aria-label="重置视角">⟲</button></div>
+  </main>
+
+  <aside class="panel" id="panel" aria-live="polite"></aside>
+
+  <footer class="time">
+    <div class="lab"><span>时间切片</span><b id="cutLab">全部</b></div>
+    <div class="track">
+      <div class="eras" id="eras"></div>
+      <div class="past" id="past"></div>
+      <input type="range" id="cut" min="0" max="1000" value="1000" aria-label="时间切片：只看此年份之前">
+      <div class="ticks" id="ticks"></div>
+    </div>
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="data.js"></script>
+<script src="detail.js"></script>
+<script>
+(function () {
+'use strict';
+const A = window.ATLAS;
+const [Y0, Y1] = A.range;
+const H = 120, EXP = 1.45;
+const yH = y => H * Math.pow(Math.max(0, (y - Y0) / (Y1 - Y0)), EXP);
+const fracToYear = f => Math.round(Y0 + (Y1 - Y0) * Math.pow(f, 1 / EXP));
+const yearFrac = y => Math.pow((y - Y0) / (Y1 - Y0), EXP);
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// ---------- 数据整理 ----------
+const D = A.domains;
+const DETAIL = window.ATLAS_DETAIL || {};
+const catOf = {}, subOf = {}, domColor = {};
+A.cats.forEach(c => c.subs.forEach((s, si) => s.domains.forEach((d, di) => {
+  catOf[d] = c; subOf[d] = s;
+  const col = new THREE.Color(c.color);
+  col.offsetHSL((si - 1) * 0.012, 0, (di - 0.6) * 0.07);
+  domColor[d] = '#' + col.getHexString();
+})));
+A.nodes.forEach((n, i) => { n.id = 'n' + i; });
+A.links.forEach((l, i) => { l.id = 'l' + i; });
+const linksChrono = A.links.slice().sort((a, b) => a.y2 - b.y2 || a.y1 - b.y1);
+const linkCount = {};
+Object.keys(D).forEach(d => linkCount[d] = 0);
+A.links.forEach(l => { linkCount[l.a]++; linkCount[l.b]++; });
+$('brandSub').textContent = `${Y0} — 今 · ${A.cats.length} 大类 · ${A.cats.reduce((s, c) => s + c.subs.length, 0)} 小类 · ${Object.keys(D).length} 领域`;
+
+// ---------- 状态 ----------
+const S = {
+  layer: 'global',      // 'global' 全局 | 'domain' 领域视图
+  dom: null,            // 当前所在领域
+  sel: null,            // {type:'domain'|'node'|'link'|'item'|'portal', id}
+  hover: null,
+  hiddenDom: new Set(),
+  hiddenKind: new Set(),
+  cut: Y1,
+  mode: 'key'
+};
+
+// ---------- 场景 ----------
+const stage = $('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setClearColor(0x060912, 1);
+stage.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x060912, 0.0032);
+const camera = new THREE.PerspectiveCamera(42, 1, 0.5, 2000);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.minDistance = 25; controls.maxDistance = 900;
+controls.maxPolarAngle = Math.PI * 0.495;
+const VIEWS = {
+  '3d':    { pos: [-78, 150, 262], tgt: [4, 58, 0] },
+  'top':   { pos: [0, 320, 30],    tgt: [0, 0, 0] },
+  'front': { pos: [0, 64, 290],    tgt: [0, 64, 0] }
+};
+let W = 1, Hh = 1;
+const narrowK = () => W / Hh < 1 ? 1.5 : W / Hh < 1.3 ? 1.25 : 1;
+
+// 光晕贴图
+const glowTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d'); const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.18, 'rgba(255,255,255,.75)');
+  gr.addColorStop(0.45, 'rgba(255,255,255,.18)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(c); return t;
+})();
+const addMat = (color, opacity) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false });
+const hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false });
+
+// 布局：大类沿 x 轴排开，小类为地面上的圆形簇，领域为簇内光柱
+const pos = {};
+const SUBW = 15, GAP = 9;
+const catSpan = [];
+let cx0 = -(A.cats.length * 3 * SUBW + (A.cats.length - 1) * GAP) / 2;
+const OFF = { 1: [[0, 0]], 2: [[-3.4, -2.4], [3.4, 2.4]], 3: [[-4, -3], [4, -1.8], [0, 4]] };
+const subCenters = [];
+A.cats.forEach(c => {
+  const start = cx0;
+  c.subs.forEach((s, si) => {
+    const sx = cx0 + SUBW / 2 + si * SUBW, sz = (si % 2 ? 5 : -3);
+    subCenters.push({ s, c, x: sx, z: sz });
+    s.domains.forEach((d, di) => { const o = OFF[s.domains.length][di]; pos[d] = new THREE.Vector3(sx + o[0], 0, sz + o[1]); });
+  });
+  cx0 += c.subs.length * SUBW;
+  catSpan.push({ c, x0: start, x1: cx0 });
+  cx0 += GAP;
+});
+const X0 = catSpan[0].x0 - 6, X1 = catSpan[catSpan.length - 1].x1 + 6, Z0 = -16, Z1 = 18;
+
+// 地面
+const grid = new THREE.GridHelper(260, 52, 0x18223f, 0x111a33); grid.position.y = -0.05; scene.add(grid);
+catSpan.forEach(({ c, x0, x1 }) => {
+  const w = x1 - x0 + 4, d = Z1 - Z0 - 4;
+  const plate = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ color: c.color, transparent: true, opacity: 0.06, depthWrite: false }));
+  plate.rotation.x = -Math.PI / 2; plate.position.set((x0 + x1) / 2, 0, (Z0 + Z1) / 2 + 1); scene.add(plate);
+  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(plate.geometry), new THREE.LineBasicMaterial({ color: c.color, transparent: true, opacity: 0.55 }));
+  edge.rotation.copy(plate.rotation); edge.position.copy(plate.position); scene.add(edge);
+});
+subCenters.forEach(sc => {
+  const pts = []; for (let i = 0; i <= 64; i++) { const a = i / 64 * Math.PI * 2; pts.push(new THREE.Vector3(sc.x + Math.cos(a) * 7.2, 0.05, sc.z + Math.sin(a) * 6.2)); }
+  const g = new THREE.BufferGeometry().setFromPoints(pts);
+  const l = new THREE.Line(g, new THREE.LineDashedMaterial({ color: sc.c.color, dashSize: 0.8, gapSize: 0.6, transparent: true, opacity: 0.5 }));
+  l.computeLineDistances(); scene.add(l);
+});
+
+// 年代平面与全局冲击
+const planeOutline = (y, color, opacity) => {
+  const pts = [[X0, Z0], [X1, Z0], [X1, Z1], [X0, Z1], [X0, Z0]].map(p => new THREE.Vector3(p[0], y, p[1]));
+  return new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
+};
+A.eras.forEach(e => { if (e[0] > Y0) scene.add(planeOutline(yH(e[0]), 0x2a3963, 0.5)); });
+A.shocks.forEach(s => {
+  const y = yH(s[0]);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(X1 - X0, Z1 - Z0), new THREE.MeshBasicMaterial({ color: 0xfb7185, transparent: true, opacity: 0.035, depthWrite: false, side: THREE.DoubleSide }));
+  m.rotation.x = -Math.PI / 2; m.position.set((X0 + X1) / 2, y, (Z0 + Z1) / 2); scene.add(m);
+  scene.add(planeOutline(y, 0xfb7185, 0.28));
+});
+// 时间切片平面
+const cutPlane = new THREE.Mesh(new THREE.PlaneGeometry(X1 - X0, Z1 - Z0), new THREE.MeshBasicMaterial({ color: 0x7cc4ff, transparent: true, opacity: 0.07, depthWrite: false, side: THREE.DoubleSide }));
+cutPlane.rotation.x = -Math.PI / 2; cutPlane.position.set((X0 + X1) / 2, H, (Z0 + Z1) / 2); cutPlane.visible = false; scene.add(cutPlane);
+const cutEdge = planeOutline(0, 0x7cc4ff, 0.8); cutEdge.visible = false; scene.add(cutEdge);
+// 时间标尺
+const rulerX = X0 - 2, rulerZ = Z0;
+scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(rulerX, 0, rulerZ), new THREE.Vector3(rulerX, H, rulerZ)]), new THREE.LineBasicMaterial({ color: 0x3b4a72 })));
+
+// 光柱
+const pillars = {};
+Object.keys(D).forEach(d => {
+  const p = pos[d], col = new THREE.Color(domColor[d]), grp = new THREE.Group();
+  const segs = [];
+  const st = D[d].stages;
+  if (st[0][0] > Y0) {
+    const h = yH(st[0][0]);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, h, 6), addMat(col, 0.25));
+    m.position.set(p.x, h / 2, p.z); grp.add(m); segs.push({ m, base: 0.25, y0: Y0 });
+  }
+  st.forEach((s, i) => {
+    const a = yH(s[0]), b = yH(s[1]), h = Math.max(0.1, b - a - 0.25), r = 0.28 + s[3] * 0.32;
+    const c2 = col.clone().offsetHSL(0, 0, i % 2 ? 0.08 : -0.04);
+    const base = i % 2 ? 0.95 : 0.62;
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 20), addMat(c2, base));
+    m.position.set(p.x, a + h / 2 + 0.12, p.z); grp.add(m); segs.push({ m, base, y0: s[0] });
+    const halo = new THREE.Mesh(new THREE.CylinderGeometry(r * 2.8, r * 2.8, h, 20, 1, true), addMat(col, 0.06 * s[3]));
+    halo.position.copy(m.position); grp.add(halo); segs.push({ m: halo, base: 0.06 * s[3], y0: s[0] });
+  });
+  const disk = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }));
+  disk.position.set(p.x, 0.3, p.z); disk.scale.set(7, 7, 1); grp.add(disk); segs.push({ m: disk, base: 0.8, y0: Y0 });
+  const hit = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 1.9, H, 8), hitMat);
+  hit.position.set(p.x, H / 2, p.z); hit.userData = { type: 'domain', id: d }; grp.add(hit);
+  scene.add(grp);
+  pillars[d] = { grp, segs, hit };
+});
+
+// 节点
+const nodeObj = {};
+A.nodes.forEach(n => {
+  const p = pos[n.d], y = yH(n.y), col = new THREE.Color(domColor[n.d]);
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const gs = 2.4 + n.w * 1.5; glow.scale.set(gs, gs, 1); glow.position.set(p.x, y, p.z);
+  const core = new THREE.Mesh(new THREE.SphereGeometry(0.28 + n.w * 0.18, 14, 10), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1 }));
+  core.position.copy(glow.position);
+  const hit = new THREE.Mesh(new THREE.SphereGeometry(1.3 + n.w * 0.3, 8, 6), hitMat);
+  hit.position.copy(glow.position); hit.userData = { type: 'node', id: n.id };
+  scene.add(glow, core, hit);
+  nodeObj[n.id] = { n, glow, core, hit, gs };
+});
+
+// 连线
+const linkObj = {};
+A.links.forEach(l => {
+  const pa = pos[l.a], pb = pos[l.b];
+  const a = new THREE.Vector3(pa.x, yH(l.y1), pa.z), b = new THREE.Vector3(pb.x, yH(l.y2), pb.z);
+  const dist = a.distanceTo(b);
+  const mid = a.clone().add(b).multiplyScalar(0.5);
+  mid.y = Math.max(a.y, b.y) + 3 + dist * 0.2;
+  const curve = new THREE.QuadraticBezierCurve3(a, mid, b);
+  const col = new THREE.Color(A.kinds[l.k].color);
+  const r = 0.07 + l.w * 0.07;
+  const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 72, r, 6, false), addMat(col, 0.75));
+  const glow = new THREE.Mesh(new THREE.TubeGeometry(curve, 72, r * 4, 6, false), addMat(col, 0.08));
+  const hit = new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 1.1, 5, false), hitMat);
+  hit.userData = { type: 'link', id: l.id };
+  const dots = [];
+  for (let i = 0; i < 1 + l.w; i++) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+    s.scale.set(1.6, 1.6, 1); s.userData.off = i / (1 + l.w); scene.add(s); dots.push(s);
+  }
+  const ends = [a, b].map(v => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false })); s.position.copy(v); s.scale.set(2.2, 2.2, 1); scene.add(s); return s; });
+  scene.add(tube, glow, hit);
+  linkObj[l.id] = { l, curve, tube, glow, hit, dots, ends, mid: curve.getPoint(0.5) };
+});
+
+// 全局场景单独成组，进入领域视图时整体隐藏
+const G = new THREE.Group();
+scene.children.slice().forEach(o => { if (o !== grid) { scene.remove(o); G.add(o); } });
+scene.add(G);
+
+// ---------- HTML 标注 ----------
+const labelsEl = $('labels');
+const labels = [];
+function addLabel(html, cls, v3, prio, anchor, extra) {
+  const el = document.createElement('div'); el.className = 'lb ' + cls; el.innerHTML = html;
+  labelsEl.appendChild(el);
+  const L = Object.assign({ el, v: v3, prio, anchor: anchor || 'c', w: 0, h: 0, show: () => true, op: () => 1 }, extra);
+  labels.push(L); return L;
+}
+catSpan.forEach(({ c, x0, x1 }) => addLabel(esc(c.name), 'cat-l', new THREE.Vector3((x0 + x1) / 2, 0, Z1 + 5), 98, 'c', { style: '--c:' + c.color }));
+subCenters.forEach(sc => addLabel(esc(sc.s.name), 'sub-l', new THREE.Vector3(sc.x, 0, sc.z + 9), 72, 'c', { style: '--c:' + sc.c.color, sub: sc }));
+const domLabels = {};
+Object.keys(D).forEach(d => {
+  domLabels[d] = addLabel(esc(D[d].name) + (DETAIL[d] ? '<span class="xp"> ⤢</span>' : ''), 'dom-l', new THREE.Vector3(pos[d].x, H + 4, pos[d].z), 90, 'c', { style: '--c:' + domColor[d], dom: d });
+});
+[1760, 1800, 1840, 1880, 1914, 1945, 1970, 1991, 2008, 2026].forEach(y => addLabel(String(y), 'tick-l', new THREE.Vector3(rulerX - 1, yH(y), rulerZ), 96, 'r'));
+A.eras.forEach(e => addLabel(esc(e[2]), 'era-l', new THREE.Vector3(X1 + 2, yH((e[0] + e[1]) / 2), Z0), 30, 'l'));
+A.shocks.forEach(s => addLabel(`${s[0]} ${esc(s[1])}`, 'shock-l', new THREE.Vector3(X1 + 2, yH(s[0]), Z1), 34, 'l'));
+const cutLabel = addLabel('', 'cut-l', new THREE.Vector3(rulerX - 1, H, Z1), 99, 'r', { show: () => S.cut < Y1 });
+const nodeLabels = {};
+A.nodes.forEach(n => {
+  nodeLabels[n.id] = addLabel(`<b>${n.y}</b>${esc(n.t)}`, 'node-l w' + n.w, nodeObj[n.id].core.position, 40 + n.w * 12 + n.y / 1000, 'l', { style: '--c:' + domColor[n.d], node: n });
+});
+const linkLabels = {};
+A.links.forEach(l => {
+  linkLabels[l.id] = addLabel(`${l.y1 === l.y2 ? l.y1 : l.y1 + '→' + l.y2} ${esc(l.t)}`, 'link-l', linkObj[l.id].mid, 50 + l.w * 6, 'b', { style: '--c:' + A.kinds[l.k].color, link: l });
+});
+labels.forEach(L => { if (L.style) L.el.setAttribute('style', L.style); });
+
+// ---------- 可见性与高亮 ----------
+function focusSet() {
+  // 返回 {doms:Set, links:Set, nodes:Set|null}，null 表示无焦点
+  const f = S.sel || S.hover;
+  if (!f) return null;
+  const doms = new Set(), links = new Set();
+  let nodes = null;
+  if (f.type === 'domain') {
+    doms.add(f.id);
+    A.links.forEach(l => { if (l.a === f.id || l.b === f.id) { links.add(l.id); doms.add(l.a); doms.add(l.b); } });
+  } else if (f.type === 'node') {
+    const n = nodeObj[f.id].n; doms.add(n.d); nodes = new Set([n.id]);
+    relatedLinks(n).forEach(l => { links.add(l.id); doms.add(l.a); doms.add(l.b); });
+  } else if (f.type === 'link') {
+    const l = linkObj[f.id].l; links.add(l.id); doms.add(l.a); doms.add(l.b);
+  }
+  return { doms, links, nodes, primary: f.type === 'domain' ? f.id : f.type === 'node' ? nodeObj[f.id].n.d : null };
+}
+function relatedLinks(n) {
+  return A.links.filter(l => (l.a === n.d && Math.abs(l.y1 - n.y) <= 8) || (l.b === n.d && Math.abs(l.y2 - n.y) <= 8));
+}
+const vis = { dom: {}, node: {}, link: {} };
+function refresh() {
+  if (S.layer === 'domain') { refreshDomain(); labels.sort((a, b) => b.prio - a.prio); return; }
+  const F = focusSet();
+  Object.keys(D).forEach(d => {
+    const hidden = S.hiddenDom.has(d);
+    const f = hidden ? 0 : !F ? 1 : F.doms.has(d) ? (F.primary === d || !F.primary ? 1 : 0.7) : 0.16;
+    vis.dom[d] = f;
+    pillars[d].grp.visible = !hidden;
+    pillars[d].segs.forEach(s => { s.m.material.opacity = s.base * f * (s.y0 > S.cut ? 0.12 : 1); });
+  });
+  A.nodes.forEach(n => {
+    const o = nodeObj[n.id];
+    let f = vis.dom[n.d];
+    if (F && F.nodes && !F.nodes.has(n.id)) f *= 0.55;
+    if (n.y > S.cut) f *= 0.08;
+    vis.node[n.id] = f;
+    o.glow.visible = o.core.visible = f > 0;
+    o.glow.material.opacity = 0.9 * f; o.core.material.opacity = f;
+  });
+  A.links.forEach(l => {
+    const o = linkObj[l.id];
+    let f = (S.hiddenDom.has(l.a) || S.hiddenDom.has(l.b) || S.hiddenKind.has(l.k)) ? 0 : 1;
+    if (f && F) f = F.links.has(l.id) ? 1 : 0.07;
+    if (l.y2 > S.cut) f *= 0.06;
+    const isSel = S.sel && S.sel.type === 'link' && S.sel.id === l.id;
+    vis.link[l.id] = f;
+    [o.tube, o.glow].forEach(m => m.visible = f > 0);
+    o.tube.material.opacity = 0.75 * f * (isSel ? 1.3 : 1);
+    o.glow.material.opacity = (isSel ? 0.22 : 0.08) * f;
+    o.dots.concat(o.ends).forEach(s => { s.visible = f > 0.2; s.material.opacity = 0.9 * f; });
+  });
+  // 时间切片
+  const showCut = S.cut < Y1;
+  cutPlane.visible = cutEdge.visible = showCut;
+  cutPlane.position.y = cutEdge.position.y = yH(S.cut);
+  cutLabel.v = new THREE.Vector3(rulerX - 1, yH(S.cut), rulerZ);
+  cutLabel.el.textContent = S.cut + ' ▸';
+  // 标注显隐规则
+  const zoomedIn = camera.position.distanceTo(controls.target) < 120;
+  labels.forEach(L => {
+    if (L.dom) L.op = () => vis.dom[L.dom] > 0.5 ? 1 : vis.dom[L.dom] > 0 ? 0.35 : 0;
+    if (L.node) {
+      const n = L.node;
+      L.op = () => vis.node[n.id] > 0.3 ? 1 : 0;
+      L.show = () => S.mode === 'all' || n.w === 3 || zoomedIn || (F && F.primary === n.d) || (F && F.nodes && F.nodes.has(n.id));
+    }
+    if (L.link) {
+      const l = L.link;
+      const sel = S.sel && S.sel.type === 'link' && S.sel.id === l.id;
+      L.el.classList.toggle('sel', !!sel);
+      L.prio = sel ? 300 : 50 + l.w * 6;
+      L.op = () => vis.link[l.id] > 0.5 ? 1 : 0;
+      L.show = () => S.mode === 'all' || l.w === 3 || (F && F.links.has(l.id));
+    }
+  });
+  labels.sort((a, b) => b.prio - a.prio);
+}
+
+// ---------- 渲染循环 ----------
+const tmp = new THREE.Vector3();
+function resize() {
+  const r = stage.getBoundingClientRect(); W = Math.max(1, r.width); Hh = Math.max(1, r.height);
+  renderer.setSize(W, Hh, false); camera.aspect = W / Hh; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+resize();
+{ const v0 = viewPos('3d'); camera.position.copy(v0.p); controls.target.copy(v0.t); }
+
+let lastZoomBucket = null;
+function placeLabels() {
+  const placed = [];
+  for (const L of labels) {
+    if ((L.layer || 'global') !== S.layer) { if (L.el.style.display !== 'none') L.el.style.display = 'none'; continue; }
+    const op = L.op();
+    if (!op || !L.show()) { if (L.el.style.display !== 'none') L.el.style.display = 'none'; continue; }
+    tmp.copy(L.v).project(camera);
+    if (tmp.z > 1 || tmp.x < -1.2 || tmp.x > 1.2 || tmp.y < -1.2 || tmp.y > 1.2) { L.el.style.display = 'none'; continue; }
+    if (L.el.style.display === 'none' || !L.w) { L.el.style.display = ''; L.w = L.el.offsetWidth; L.h = L.el.offsetHeight; }
+    const sx = (tmp.x + 1) / 2 * W, sy = (1 - tmp.y) / 2 * Hh;
+    let x = sx, y = sy;
+    if (L.anchor === 'c') { x -= L.w / 2; y -= L.h / 2; }
+    else if (L.anchor === 'l') { x += 9; y -= L.h / 2; }
+    else if (L.anchor === 'r') { x -= L.w + 6; y -= L.h / 2; }
+    else if (L.anchor === 'b') { x -= L.w / 2; y -= L.h + 4; }
+    const rect = [x - 2, y - 1, x + L.w + 2, y + L.h + 1];
+    let clash = false;
+    if (L.prio < 95) for (const p of placed) { if (rect[0] < p[2] && rect[2] > p[0] && rect[1] < p[3] && rect[3] > p[1]) { clash = true; break; } }
+    if (clash) { L.el.style.display = 'none'; continue; }
+    placed.push(rect);
+    L.el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px)`;
+    L.el.style.opacity = op;
+  }
+}
+let t0 = performance.now();
+function frame(now) {
+  controls.update();
+  const t = (now - t0) / 1000;
+  if (!reduced) A.links.forEach(l => {
+    const o = linkObj[l.id];
+    o.dots.forEach(s => { s.position.copy(o.curve.getPoint((t * 0.12 * (0.7 + l.w * 0.25) + s.userData.off) % 1)); });
+  });
+  const zb = camera.position.distanceTo(controls.target) < 120;
+  if (zb !== lastZoomBucket) { lastZoomBucket = zb; }
+  renderer.render(scene, camera);
+  placeLabels();
+  requestAnimationFrame(frame);
+}
+if (reduced) A.links.forEach(l => linkObj[l.id].dots.forEach(s => s.position.copy(linkObj[l.id].curve.getPoint(s.userData.off))));
+
+// ---------- 拾取 ----------
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+const tip = $('tip');
+function pick(ev) {
+  const r = renderer.domElement.getBoundingClientRect();
+  mouse.set((ev.clientX - r.left) / r.width * 2 - 1, -(ev.clientY - r.top) / r.height * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  if (S.layer === 'domain') return pickDomain();
+  const targets = [];
+  A.nodes.forEach(n => { if (vis.node[n.id] > 0.3) targets.push(nodeObj[n.id].hit); });
+  A.links.forEach(l => { if (vis.link[l.id] > 0.3) targets.push(linkObj[l.id].hit); });
+  Object.keys(D).forEach(d => { if (!S.hiddenDom.has(d)) targets.push(pillars[d].hit); });
+  const hits = ray.intersectObjects(targets, false);
+  for (const type of ['node', 'link', 'domain']) { const h = hits.find(h => h.object.userData.type === type); if (h) return h.object.userData; }
+  return null;
+}
+function sameRef(a, b) { return a && b && a.type === b.type && a.id === b.id; }
+let hoverRaf = 0, lastEv = null;
+renderer.domElement.addEventListener('pointermove', ev => {
+  lastEv = ev;
+  if (hoverRaf) return;
+  hoverRaf = requestAnimationFrame(() => {
+    hoverRaf = 0;
+    if (lastEv.buttons) { tip.hidden = true; return; }
+    const h = pick(lastEv);
+    renderer.domElement.style.cursor = h ? 'pointer' : 'grab';
+    if (!sameRef(h, S.hover)) { S.hover = h; if (!S.sel) refresh(); }
+    if (h) { showTip(h, lastEv); } else tip.hidden = true;
+  });
+});
+renderer.domElement.addEventListener('pointerleave', () => { tip.hidden = true; if (S.hover) { S.hover = null; if (!S.sel) refresh(); } });
+function showTip(h, ev) {
+  let y = '', t = '', x = '';
+  if (h.type === 'item') { const it = itemById[h.id]; y = `${spanText(it)} · ${laneOf(it.k).name}${it.by ? ' · ' + it.by : ''}`; t = it.t; x = it.x; }
+  else if (h.type === 'portal') { y = `${catOf[h.id].name} › ${subOf[h.id].name}`; t = '跳转到「' + D[h.id].name + '」领域'; x = D[h.id].desc; }
+  else if (h.type === 'node') { const n = nodeObj[h.id].n; y = `${n.y} · ${D[n.d].name}`; t = n.t; x = n.x; }
+  else if (h.type === 'link') { const l = linkObj[h.id].l; y = `${l.y1 === l.y2 ? l.y1 : l.y1 + ' → ' + l.y2} · ${D[l.a].name} → ${D[l.b].name} · ${A.kinds[l.k].name}`; t = l.t; x = l.what; }
+  else { const d = D[h.id]; y = `${catOf[h.id].name} › ${subOf[h.id].name}`; t = d.name; x = d.desc; }
+  tip.innerHTML = `<div class="t-y">${esc(y)}</div><div class="t-t">${esc(t)}</div><div class="t-x">${esc(x)}</div>`;
+  tip.hidden = false;
+  const r = stage.getBoundingClientRect();
+  let px = ev.clientX - r.left + 16, py = ev.clientY - r.top + 16;
+  if (px + 290 > r.width) px = ev.clientX - r.left - 296;
+  if (py + tip.offsetHeight > r.height) py = r.height - tip.offsetHeight - 8;
+  tip.style.left = px + 'px'; tip.style.top = py + 'px';
+}
+let downAt = null;
+renderer.domElement.addEventListener('pointerdown', ev => { downAt = [ev.clientX, ev.clientY]; tip.hidden = true; });
+renderer.domElement.addEventListener('pointerup', ev => {
+  if (!downAt || Math.hypot(ev.clientX - downAt[0], ev.clientY - downAt[1]) > 5) return;
+  const h = pick(ev);
+  select(h, false);
+});
+
+renderer.domElement.addEventListener('dblclick', ev => {
+  if (S.layer !== 'global') return;
+  const h = pick(ev);
+  if (h && h.type === 'domain') enterDomain(h.id);
+  else if (h && h.type === 'node') { enterDomain(nodeObj[h.id].n.d); select(h, true); }
+});
+
+// ---------- 选择与镜头 ----------
+let tween = null;
+function flyTo(tgt, dist) {
+  const from = { p: camera.position.clone(), t: controls.target.clone() };
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  const to = { t: tgt.clone(), p: tgt.clone().add(dir.multiplyScalar(dist)) };
+  if (reduced) { camera.position.copy(to.p); controls.target.copy(to.t); return; }
+  const start = performance.now(), dur = 750;
+  cancelAnimationFrame(tween);
+  const step = now => {
+    const k = Math.min(1, (now - start) / dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+    camera.position.lerpVectors(from.p, to.p, e); controls.target.lerpVectors(from.t, to.t, e);
+    if (k < 1) tween = requestAnimationFrame(step); else refresh();
+  };
+  tween = requestAnimationFrame(step);
+}
+function viewPos(name) {
+  const v = (S.layer === 'domain' && DM ? DM.views : VIEWS)[name], t = new THREE.Vector3(...v.tgt);
+  return { t, p: new THREE.Vector3(...v.pos).sub(t).multiplyScalar(narrowK()).add(t) };
+}
+function flyView(name) {
+  const from = { p: camera.position.clone(), t: controls.target.clone() };
+  const to = viewPos(name);
+  ['v3d', 'vtop', 'vfront'].forEach(id => $(id).setAttribute('aria-pressed', String(id === { '3d': 'v3d', top: 'vtop', front: 'vfront' }[name])));
+  if (reduced) { camera.position.copy(to.p); controls.target.copy(to.t); refresh(); return; }
+  const start = performance.now(), dur = 900;
+  cancelAnimationFrame(tween);
+  const step = now => {
+    const k = Math.min(1, (now - start) / dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+    camera.position.lerpVectors(from.p, to.p, e); controls.target.lerpVectors(from.t, to.t, e);
+    if (k < 1) tween = requestAnimationFrame(step); else refresh();
+  };
+  tween = requestAnimationFrame(step);
+}
+function select(ref, fly) {
+  if (S.layer === 'domain') return selectInDomain(ref, fly);
+  S.sel = ref; S.hover = null;
+  if (ref && S.hiddenDom.size) {
+    const ds = ref.type === 'domain' ? [ref.id] : ref.type === 'node' ? [nodeObj[ref.id].n.d] : [linkObj[ref.id].l.a, linkObj[ref.id].l.b];
+    ds.forEach(d => S.hiddenDom.delete(d)); renderTree();
+  }
+  refresh(); renderPanel();
+  document.querySelectorAll('.dom').forEach(b => b.classList.toggle('on', !!ref && ref.type === 'domain' && b.dataset.d === ref.id));
+  if (fly && ref) {
+    const k = narrowK();
+    if (ref.type === 'domain') flyTo(new THREE.Vector3(pos[ref.id].x, H * 0.55, pos[ref.id].z), 200 * k);
+    else if (ref.type === 'node') flyTo(nodeObj[ref.id].core.position, 120 * k);
+    else flyTo(linkObj[ref.id].mid, Math.max(150, linkObj[ref.id].curve.getLength() * 1.5) * k);
+  }
+}
+
+// ---------- 详情面板 ----------
+const panel = $('panel');
+const kindPill = k => `<span class="pill" style="--c:${A.kinds[k].color}">${A.kinds[k].name}</span>`;
+const domBtn = d => `<button class="dlink" data-go="${S.layer === 'domain' ? 'enter' : 'domain'}:${d}" style="--c:${domColor[d]}">${esc(D[d].name)}</button>`;
+const chipSec = (title, arr, c) => arr && arr.length ? `<div class="sec"><h3>${title}</h3><div class="chips">${arr.map(x => `<span class="chip" style="--c:${c}">${esc(x)}</span>`).join('')}</div></div>` : '';
+const crumb = txt => `<div class="crumb">${txt}<button class="close" data-go="none">${S.layer === 'domain' ? '返回领域概览' : '返回总览'} ✕</button></div>`;
+const linkRow = (l, from) => {
+  const other = from ? (l.a === from ? l.b : l.a) : null;
+  const dir = from ? (l.a === from ? '→ ' : '← ') : '';
+  return `<button class="row" data-go="link:${l.id}"><span class="y">${l.y2}</span><span class="tt"><span class="dot" style="--c:${A.kinds[l.k].color}"></span>${esc(l.t)}<small>${from ? dir + esc(D[other].name) : esc(D[l.a].name) + ' → ' + esc(D[l.b].name)}</small></span><span class="rt">${A.kinds[l.k].name}</span></button>`;
+};
+
+function renderPanel() {
+  const s = S.sel;
+  if (S.layer === 'domain') {
+    if (!s) return renderDomainView(S.dom);
+    if (s.type === 'item') return renderItem(itemById[s.id]);
+  }
+  if (!s) return renderOverview();
+  if (s.type === 'domain') return renderDomain(s.id);
+  if (s.type === 'node') return renderNode(nodeObj[s.id].n);
+  if (s.type === 'link') return renderLink(linkObj[s.id].l);
+}
+function renderOverview() {
+  const nN = A.nodes.length, nL = A.links.length;
+  // 每十年的跨领域连线，按类型堆叠
+  const bins = {}; const dec0 = 1760, dec1 = 2020;
+  for (let y = dec0; y <= dec1; y += 10) bins[y] = { tech: 0, cap: 0, policy: 0, idea: 0, n: 0 };
+  A.links.forEach(l => { const b = Math.min(dec1, Math.floor(l.y2 / 10) * 10); bins[b][l.k]++; bins[b].n++; });
+  const keys = Object.keys(bins).map(Number), max = Math.max(...keys.map(k => bins[k].n));
+  const cw = 330, ch = 110, bw = cw / keys.length;
+  let bars = '';
+  keys.forEach((k, i) => {
+    let y = ch;
+    ['tech', 'cap', 'policy', 'idea'].forEach(kind => {
+      const h = bins[k][kind] / max * (ch - 10);
+      if (h > 0) { y -= h; bars += `<rect x="${(i * bw + 1).toFixed(1)}" y="${y.toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="${A.kinds[kind].color}" opacity=".85"><title>${k}年代 ${A.kinds[kind].name} ${bins[k][kind]} 条</title></rect>`; }
+    });
+  });
+  const axis = [1800, 1850, 1900, 1950, 2000].map(y => `<text x="${((y - dec0) / 10 * bw + bw / 2).toFixed(1)}" y="${ch + 13}" text-anchor="middle">${y}</text>`).join('');
+  const top = Object.keys(D).sort((a, b) => linkCount[b] - linkCount[a]).slice(0, 7);
+  const topMax = linkCount[top[0]];
+  const key = linksChrono.filter(l => l.w === 3);
+  panel.innerHTML = `
+    <div class="crumb">全局总览</div>
+    <h2>${A.cats.length} 个大类，${Object.keys(D).length} 根光柱，${nL} 次交汇</h2>
+    <p class="lede">每根光柱是一个领域，从地面的 1760 年向上生长到今天。光柱的粗细表示该阶段的活跃度，亮暗交替的色段是发展阶段。领域之间的光弧是跨领域的交汇，颜色表示是什么力量促成了联动。</p>
+    <div class="stats">
+      <div class="stat"><b>${Object.keys(D).length}</b><span>领域</span></div>
+      <div class="stat"><b>${nN}</b><span>关键节点</span></div>
+      <div class="stat"><b>${nL}</b><span>跨领域连线</span></div>
+      <div class="stat"><b>${A.shocks.length}</b><span>全局冲击</span></div>
+    </div>
+    <div class="sec"><h3>跨领域交汇的年代分布</h3>
+      <svg class="chart" viewBox="0 0 ${cw} ${ch + 18}" width="100%" role="img" aria-label="各年代跨领域连线数量">${bars}${axis}</svg>
+      <p style="font-size:12px;color:var(--muted);margin-top:6px">战后与 1970 年代是交汇最密集的时期：冷战、石油危机和信用货币几乎同时重塑了所有领域。</p>
+    </div>
+    <div class="sec"><h3>连接最多的领域</h3><div class="bars">${top.map(d => `<button class="bar" data-go="domain:${d}" style="--c:${domColor[d]}"><span>${esc(D[d].name)}</span><span class="tr"><i style="width:${linkCount[d] / topMax * 100}%"></i></span><span class="n">${linkCount[d]}</span></button>`).join('')}</div></div>
+    <div class="sec"><h3>关键交汇（按时间）</h3><div class="list">${key.map(l => linkRow(l)).join('')}</div></div>
+    <div class="sec"><h3>怎么读这张图</h3><ul class="how">
+      <li>点一根光柱，看这个领域的阶段、节点和它与谁相连。</li>
+      <li>点一条光弧，看是什么事件促成了两个领域的联动。</li>
+      <li>拖动底部时间轴，只看某一年之前的世界。</li>
+      <li>横贯全场的红色平面是同时冲击所有领域的全局事件。</li>
+    </ul></div>`;
+}
+function renderDomain(d) {
+  const dm = D[d], c = domColor[d];
+  const nodes = A.nodes.filter(n => n.d === d).sort((a, b) => a.y - b.y);
+  const links = A.links.filter(l => l.a === d || l.b === d).sort((a, b) => a.y2 - b.y2);
+  const peers = {};
+  links.forEach(l => { const o = l.a === d ? l.b : l.a; peers[o] = (peers[o] || 0) + 1; });
+  const peerList = Object.keys(peers).sort((a, b) => peers[b] - peers[a]);
+  const outN = links.filter(l => l.a === d).length;
+  panel.innerHTML = `
+    ${crumb(`${esc(catOf[d].name)} › ${esc(subOf[d].name)} › 领域`)}
+    <h2 style="color:${c}">${esc(dm.name)}</h2>
+    <p class="lede">${esc(dm.desc)}</p>
+    <button class="enter" data-go="enter:${d}" style="--c:${c}"><span>进入领域视图 ↗</span><small>${DETAIL[d] ? DETAIL[d].length + ' 条著作、人物、思想与辩论' : '里程碑与跨领域连线（细节待补充）'}</small></button>
+    <div class="meta" style="margin-top:12px"><span class="pill" style="--c:${c}">输出影响 ${outN}</span><span class="pill" style="--c:${c}">接受影响 ${links.length - outN}</span></div>
+    <div class="sec"><h3>前史（1760 年以前）</h3><p>${esc(dm.pre)}</p></div>
+    <div class="sec"><h3>发展阶段 · 活跃度</h3><div class="stages">${dm.stages.map(s => `<div class="stg" style="--c:${c}"><span class="y">${s[0]}–${s[1]}</span><span>${esc(s[2])}</span><span class="heat">${[1, 2, 3].map(i => `<i class="${i <= s[3] ? 'on' : ''}"></i>`).join('')}</span></div>`).join('')}</div></div>
+    <div class="sec"><h3>关键节点</h3><div class="list">${nodes.map(n => `<button class="row" data-go="node:${n.id}"><span class="y">${n.y}</span><span class="tt">${esc(n.t)}</span><span class="rt">${'●'.repeat(n.w)}</span></button>`).join('')}</div></div>
+    ${peerList.length ? `<div class="sec"><h3>联系最紧密的领域</h3><div class="bars">${peerList.map(o => `<button class="bar" data-go="domain:${o}" style="--c:${domColor[o]}"><span>${esc(D[o].name)}</span><span class="tr"><i style="width:${peers[o] / peers[peerList[0]] * 100}%"></i></span><span class="n">${peers[o]}</span></button>`).join('')}</div></div>` : ''}
+    <div class="sec"><h3>跨领域连线</h3><div class="list">${links.map(l => linkRow(l, d)).join('') || '<p>暂无</p>'}</div></div>`;
+}
+function renderNode(n) {
+  const c = domColor[n.d];
+  const rel = relatedLinks(n);
+  const sib = A.nodes.filter(m => m.d === n.d).sort((a, b) => a.y - b.y);
+  const i = sib.indexOf(n);
+  const stage = D[n.d].stages.find(s => n.y >= s[0] && n.y < s[1]) || D[n.d].stages[D[n.d].stages.length - 1];
+  panel.innerHTML = `
+    ${crumb(`关键节点 · ${'●'.repeat(n.w)}${'○'.repeat(3 - n.w)}`)}
+    <h2><span class="yr">${n.y}</span>${esc(n.t)}</h2>
+    <div class="meta">${domBtn(n.d)}<span style="color:var(--faint)">·</span><span style="color:var(--muted);font-size:12px">所处阶段：${esc(stage[2])}</span></div>
+    <p class="lede">${esc(n.x)}</p>
+    ${chipSec('关键人物', n.p, '#a78bfa')}${chipSec('关键书籍', n.bk, '#fb923c')}${chipSec('关键事件', n.e, '#38bdf8')}
+    ${rel.length ? `<div class="sec"><h3>同时期的跨领域连线</h3><div class="list">${rel.map(l => linkRow(l, n.d)).join('')}</div></div>` : ''}
+    <div class="nav2">
+      <button data-go="${i > 0 ? 'node:' + sib[i - 1].id : 'none'}" ${i > 0 ? '' : 'disabled style="opacity:.35"'}>← ${i > 0 ? sib[i - 1].y + ' ' + esc(sib[i - 1].t) : '已是最早'}</button>
+      <button data-go="${i < sib.length - 1 ? 'node:' + sib[i + 1].id : 'none'}" ${i < sib.length - 1 ? '' : 'disabled style="opacity:.35"'}>${i < sib.length - 1 ? sib[i + 1].y + ' ' + esc(sib[i + 1].t) : '已是最新'} →</button>
+    </div>`;
+}
+function renderLink(l) {
+  const inDom = S.layer === 'domain';
+  const pool = inDom ? linksChrono.filter(o => o.a === S.dom || o.b === S.dom) : linksChrono;
+  const i = pool.indexOf(l), prev = pool[i - 1], next = pool[i + 1];
+  const touches = new Set();
+  pool.forEach(o => { if (o !== l && Math.abs(o.y2 - l.y2) <= 3) touches.add(o); });
+  const jumps = inDom ? [l.a === S.dom ? l.b : l.a] : [l.a, l.b];
+  panel.innerHTML = `
+    ${crumb(`跨领域连线 · 第 ${i + 1} / ${pool.length} 条${inDom ? '（本领域）' : ''}`)}
+    <h2><span class="yr">${l.y1 === l.y2 ? l.y1 : l.y1 + '→' + l.y2}</span>${esc(l.t)}</h2>
+    <div class="meta">${kindPill(l.k)}${domBtn(l.a)}<span style="color:var(--muted)">→</span>${domBtn(l.b)}<span style="color:var(--faint);font-size:12px;margin-left:4px">强度 ${'●'.repeat(l.w)}${'○'.repeat(3 - l.w)}</span></div>
+    <div class="sec trio">
+      <div><h4>背景</h4><p>${esc(l.bg)}</p></div>
+      <div><h4>发生了什么</h4><p>${esc(l.what)}</p></div>
+      <div><h4>后果</h4><p>${esc(l.out)}</p></div>
+    </div>
+    ${chipSec('关键人物', l.p, '#a78bfa')}${chipSec('关键书籍', l.bk, '#fb923c')}${chipSec('关键事件', l.e, '#38bdf8')}
+    ${jumps.map(d => `<button class="enter" data-go="enter:${d}" style="--c:${domColor[d]}"><span>${inDom ? '跳转到' : '进入'}「${esc(D[d].name)}」领域视图 →</span><small>${esc(catOf[d].name)} › ${esc(subOf[d].name)}</small></button>`).join('')}
+    ${touches.size ? `<div class="sec"><h3>同一时期的其他交汇</h3><div class="list">${[...touches].sort((a, b) => a.y2 - b.y2).map(o => linkRow(o)).join('')}</div></div>` : ''}
+    <div class="nav2">
+      <button data-go="${prev ? 'link:' + prev.id : 'none'}" ${prev ? '' : 'disabled style="opacity:.35"'}>← ${prev ? prev.y2 + ' ' + esc(prev.t) : '已是最早'}</button>
+      <button data-go="${next ? 'link:' + next.id : 'none'}" ${next ? '' : 'disabled style="opacity:.35"'}>${next ? next.y2 + ' ' + esc(next.t) : '已是最新'} →</button>
+    </div>`;
+  panel.scrollTop = 0;
+}
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-go]'); if (!b || b.disabled) return;
+  const g = b.dataset.go;
+  if (g === 'none') { select(null); return; }
+  if (g === 'exit') { exitDomain(); return; }
+  const [type, id] = g.split(':');
+  go(type, id);
+  if ($('results').contains(b)) { $('results').hidden = true; $('q').value = ''; }
+  if (innerWidth <= 860 && $('tree').contains(b)) toggleTree(false);
+});
+
+// ---------- 领域视图 ----------
+// 进入一个领域后，光柱展开为五条泳道；跨领域连线只画成右侧的出口，点击出口才跳转。
+const LANES = [
+  { k: 'milestone', name: '里程碑' },
+  { k: 'work', name: '经典著作', color: '#fbbf24' },
+  { k: 'person', name: '人物', color: '#c4b5fd' },
+  { k: 'idea', name: '思想', color: '#7dd3fc' },
+  { k: 'debate', name: '辩论', color: '#f9a8d4' }
+];
+const laneOf = k => LANES.find(l => l.k === k);
+const itemById = {}, itemDom = {};
+Object.keys(DETAIL).forEach(d => DETAIL[d].forEach(it => { itemById[it.id] = it; itemDom[it.id] = d; }));
+const spanText = it => it.k === 'person' ? `${it.y}–${it.y2 || ''}` : it.k === 'debate' ? `${it.y}–${it.y2 || '至今'}` : String(it.y);
+const HD = 150, LX0 = -46, LSTEP = 26;
+const laneX = i => LX0 + i * LSTEP;
+const SPINE_X = LX0 - 20, XOUT = laneX(4) + 16;
+let DM = null;
+
+function buildDomain(d) {
+  const col = new THREE.Color(domColor[d]);
+  const grp = new THREE.Group();
+  const ms = A.nodes.filter(n => n.d === d);
+  const items = DETAIL[d] || [];
+  const xl = A.links.filter(l => l.a === d || l.b === d).sort((a, b) => (a.a === d ? a.y1 : a.y2) - (b.a === d ? b.y1 : b.y2));
+  const sideYear = l => l.a === d ? l.y1 : l.y2;
+  const years = [...ms.map(n => n.y), ...items.filter(i => i.k !== 'person').map(i => i.y), ...items.filter(i => i.k === 'person').map(i => i.y + 20), ...xl.map(sideYear)];
+  const yS = Math.max(Y0, Math.floor((Math.min(...years) - 6) / 5) * 5), yE = Y1;
+  const yD = y => HD * Math.pow(Math.max(0, Math.min(1, (y - yS) / (yE - yS))), 1.15);
+  const objs = {}, hits = [], lbls = [], rels = [], stubs = {};
+  const V = (x, y, z) => new THREE.Vector3(x, y, z || 0);
+  const lab = (html, cls, v, prio, anchor, extra) => {
+    const L = addLabel(html, cls, v, prio, anchor, Object.assign({ layer: 'domain' }, extra));
+    if (L.style) L.el.setAttribute('style', L.style);
+    lbls.push(L); return L;
+  };
+  const line = (pts, color, opacity) => { const m = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color, transparent: true, opacity })); grp.add(m); return m; };
+
+  // 地板与泳道
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(XOUT - SPINE_X + 40, 30), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.05, depthWrite: false }));
+  floor.rotation.x = -Math.PI / 2; floor.position.set((SPINE_X + XOUT + 30) / 2, 0, 0); grp.add(floor);
+  LANES.forEach((ln, i) => {
+    const c = ln.color || domColor[d];
+    line([V(laneX(i), 0), V(laneX(i), HD + 2)], c, 0.35);
+    const base = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color(c), transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false }));
+    base.position.set(laneX(i), 0.3, 0); base.scale.set(5, 5, 1); grp.add(base);
+    const n = ln.k === 'milestone' ? ms.length : items.filter(it => it.k === ln.k).length;
+    lab(`${ln.name} <span style="opacity:.6;font-weight:400">${n}</span>`, 'lane-l', V(laneX(i), HD + 8), 97, 'c', { style: '--c:' + c });
+  });
+  lab('跨领域出口', 'lane-l', V(XOUT + 6, HD + 8), 97, 'c', { style: '--c:#9aa6c9' });
+  line([V(XOUT - 6, 0), V(XOUT - 6, HD + 2)], 0x56618a, 0.25);
+
+  // 左侧脊柱：沿用光柱的阶段与活跃度
+  const spine = [];
+  D[d].stages.forEach((s, i) => {
+    if (s[1] <= yS) return;
+    const a = yD(Math.max(s[0], yS)), b = yD(s[1]), h = Math.max(0.1, b - a - 0.3), r = 0.35 + s[3] * 0.4;
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 20), addMat(col.clone().offsetHSL(0, 0, i % 2 ? 0.08 : -0.04), i % 2 ? 0.95 : 0.62));
+    m.position.set(SPINE_X, a + h / 2 + 0.15, 0); grp.add(m); spine.push({ m, base: m.material.opacity, y0: s[0] });
+    const halo = new THREE.Mesh(new THREE.CylinderGeometry(r * 2.8, r * 2.8, h, 20, 1, true), addMat(col, 0.06 * s[3]));
+    halo.position.copy(m.position); grp.add(halo); spine.push({ m: halo, base: 0.06 * s[3], y0: s[0] });
+    if (s[0] > yS) line([V(SPINE_X, a), V(XOUT + 26, a)], 0x2a3963, 0.6);
+    lab(esc(s[2]), 'stg-l', V(SPINE_X + 2.2, (a + b) / 2), 94, 'l', { style: '--c:' + domColor[d] });
+  });
+  const span = yE - yS, step = span > 180 ? 25 : span > 110 ? 20 : 10;
+  for (let y = Math.ceil(yS / step) * step; y <= yE; y += step) lab(String(y), 'tick-l', V(SPINE_X - 3, yD(y)), 96, 'r');
+  if (yS > Y0) lab(`${yS} 以前略`, 'tick-l', V(SPINE_X - 3, -3), 60, 'r');
+
+  // 条目：点（里程碑、著作、思想）与时间段（人物、辩论）
+  const pointItem = (id, ref, lane, y, w, c, html) => {
+    const p = V(lane, yD(y));
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color(c), transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+    const gs = 2.4 + w * 1.4; glow.scale.set(gs, gs, 1); glow.position.copy(p);
+    const core = new THREE.Mesh(new THREE.SphereGeometry(0.3 + w * 0.17, 14, 10), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1 }));
+    core.position.copy(p);
+    const hit = new THREE.Mesh(new THREE.SphereGeometry(1.5 + w * 0.3, 8, 6), hitMat);
+    hit.position.copy(p); hit.userData = ref; hits.push(hit);
+    grp.add(glow, core, hit);
+    const L = lab(html, 'node-l w' + w, p, 40 + w * 12 + y / 10000, 'l', { style: '--c:' + c });
+    objs[id] = { ref, y, y2: y, w, pos: p, mats: [[glow.material, 0.9], [core.material, 1]], lbl: L, bar: false };
+  };
+  const placeLane = (list, laneIdx) => {
+    let prevY = -1e9, off = 0;
+    list.sort((a, b) => a.y - b.y).forEach(o => {
+      off = (o.y - prevY < 5 && off === 0) ? 3.2 : 0; prevY = o.y;
+      o.x = laneX(laneIdx) + off;
+    });
+    return list;
+  };
+  placeLane(ms.map(n => ({ n, y: n.y })), 0).forEach(o => pointItem(o.n.id, { type: 'node', id: o.n.id }, o.x, o.n.y, o.n.w, domColor[d], `<b>${o.n.y}</b>${esc(o.n.t)}`));
+  [['work', 1], ['idea', 3]].forEach(([k, li]) => {
+    const c = laneOf(k).color;
+    placeLane(items.filter(it => it.k === k).map(it => ({ it, y: it.y })), li).forEach(o => pointItem(o.it.id, { type: 'item', id: o.it.id }, o.x, o.it.y, o.it.w, c, `<b>${o.it.y}</b>${esc(o.it.t)}`));
+  });
+  [['person', 2], ['debate', 4]].forEach(([k, li]) => {
+    const c = new THREE.Color(laneOf(k).color);
+    const list = items.filter(it => it.k === k).sort((a, b) => a.y - b.y);
+    const ends = [];
+    list.forEach(it => {
+      const y2 = it.y2 || yE;
+      let ci = ends.findIndex(e => e < it.y - 2); if (ci < 0) { ci = ends.length; ends.push(0); }
+      ends[ci] = y2;
+      it._col = ci;
+    });
+    const nc = Math.max(1, ends.length), gap = Math.min(2.6, 14 / nc);
+    list.forEach(it => {
+      const x = laneX(li) - (nc - 1) * gap / 2 + it._col * gap;
+      const a = yD(it.y), b = yD(it.y2 || yE), h = Math.max(0.5, b - a);
+      const mats = [];
+      const r = 0.16 + it.w * 0.1;
+      if (k === 'debate') {
+        [-0.38, 0.38].forEach((dx, si) => {
+          const m = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.75, r * 0.75, h, 10), addMat(si ? new THREE.Color('#7dd3fc') : c, 0.85));
+          m.position.set(x + dx, a + h / 2, 0); grp.add(m); mats.push([m.material, 0.85]);
+        });
+      } else {
+        const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 10), addMat(c, 0.8));
+        m.position.set(x, a + h / 2, 0); grp.add(m); mats.push([m.material, 0.8]);
+        if (!it.y2) { const tip = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: c, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false })); tip.position.set(x, b, 0); tip.scale.set(3, 3, 1); grp.add(tip); mats.push([tip.material, 0.8]); }
+      }
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.3 + it.w * 0.15, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1 }));
+      cap.position.set(x, a, 0); grp.add(cap); mats.push([cap.material, 1]);
+      const hit = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, h + 2, 6), hitMat);
+      hit.position.set(x, a + h / 2, 0); hit.userData = { type: 'item', id: it.id }; hits.push(hit); grp.add(hit);
+      const html = k === 'person' ? `${esc(it.t)}<b>${spanText(it)}</b>` : `<b style="margin:0 4px 0 0">${it.y}</b>${esc(it.t)}`;
+      const L = lab(html, 'bar-l w' + it.w, V(x, a), 40 + it.w * 12 + it.y / 10000, 'l', { style: '--c:' + laneOf(k).color });
+      objs[it.id] = { ref: { type: 'item', id: it.id }, y: it.y, y2: it.y2 || yE, w: it.w, pos: V(x, (a + b) / 2), x, a, b, mats, lbl: L, bar: true };
+    });
+  });
+
+  // 领域内关联
+  const anchor = (o, year) => o.bar ? V(o.x, yD(Math.max(o.y, Math.min(o.y2, year)))) : o.pos.clone();
+  items.forEach(it => (it.rel || []).forEach(rid => {
+    const A1 = objs[it.id], B1 = objs[rid]; if (!A1 || !B1) return;
+    const ya = A1.bar ? B1.y : A1.y, yb = B1.bar ? A1.y : B1.y;
+    const p1 = anchor(A1, ya), p2 = anchor(B1, yb);
+    const mid = p1.clone().add(p2).multiplyScalar(0.5); mid.z += 6 + p1.distanceTo(p2) * 0.08;
+    const pts = new THREE.QuadraticBezierCurve3(p1, mid, p2).getPoints(24);
+    const m = line(pts, 0xffffff, 0.13);
+    rels.push({ m, a: it.id, b: rid });
+  }));
+
+  // 跨领域出口
+  xl.forEach((l, i) => {
+    const other = l.a === d ? l.b : l.a, out = l.a === d, y = yD(sideYear(l));
+    const kc = new THREE.Color(A.kinds[l.k].color);
+    const x0 = XOUT - 6, x1 = XOUT + 6 + (i % 3) * 5;
+    const curve = new THREE.QuadraticBezierCurve3(V(x0, y), V((x0 + x1) / 2, y + 1.5, 3), V(x1, y));
+    const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 20, 0.1 + l.w * 0.06, 6, false), addMat(kc, 0.8));
+    const dot = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: kc, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+    dot.position.set(x0, y, 0); dot.scale.set(2, 2, 1);
+    const portal = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color(domColor[other]), transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false }));
+    portal.position.set(x1, y, 0); portal.scale.set(4.2, 4.2, 1);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.3, 0.09, 6, 28), new THREE.MeshBasicMaterial({ color: new THREE.Color(domColor[other]), transparent: true, opacity: 0.9 }));
+    ring.position.copy(portal.position);
+    const hitS = new THREE.Mesh(new THREE.TubeGeometry(curve, 8, 1.1, 5, false), hitMat); hitS.userData = { type: 'link', id: l.id };
+    const hitP = new THREE.Mesh(new THREE.SphereGeometry(2.2, 8, 6), hitMat); hitP.position.copy(portal.position); hitP.userData = { type: 'portal', id: other };
+    grp.add(tube, dot, portal, ring, hitS, hitP); hits.push(hitS, hitP);
+    const L = lab(`${out ? '→' : '←'} <em>${esc(D[other].name)}</em> · ${esc(l.t)}`, 'xl-l', portal.position, 45 + l.w * 6, 'l', { style: '--c:' + domColor[other] });
+    stubs[l.id] = { l, y: sideYear(l), mats: [[tube.material, 0.8], [dot.material, 0.9], [portal.material, 1], [ring.material, 0.9]], lbl: L, pos: curve.getPoint(0.5) };
+  });
+
+  // 时间切片
+  const cut = new THREE.Mesh(new THREE.PlaneGeometry(XOUT - SPINE_X + 50, 30), new THREE.MeshBasicMaterial({ color: 0x7cc4ff, transparent: true, opacity: 0.08, depthWrite: false, side: THREE.DoubleSide }));
+  cut.rotation.x = -Math.PI / 2; cut.position.set((SPINE_X + XOUT + 30) / 2, 0, 0); cut.visible = false; grp.add(cut);
+
+  const cx = (SPINE_X + XOUT + 26) / 2;
+  const views = {
+    '3d': { pos: [cx - 92, HD * 0.66, 246], tgt: [cx, HD * 0.5, 0] },
+    'top': { pos: [cx, 240, 30], tgt: [cx, 0, 0] },
+    'front': { pos: [cx, HD * 0.5, 270], tgt: [cx, HD * 0.5, 0] }
+  };
+  return { d, grp, yD, yS, objs, hits, lbls, rels, stubs, spine, cut, views };
+}
+
+function disposeDomain() {
+  if (!DM) return;
+  scene.remove(DM.grp);
+  DM.grp.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material !== hitMat) o.material.dispose(); });
+  DM.lbls.forEach(L => { L.el.remove(); const i = labels.indexOf(L); if (i >= 0) labels.splice(i, 1); });
+  DM = null;
+}
+
+function domainFocus() {
+  const f = S.sel || S.hover;
+  if (!f) return null;
+  const ids = new Set(), links = new Set();
+  if (f.type === 'item' || f.type === 'node') {
+    ids.add(f.id);
+    DM.rels.forEach(r => { if (r.a === f.id) ids.add(r.b); if (r.b === f.id) ids.add(r.a); });
+    const o = DM.objs[f.id];
+    if (o) Object.values(DM.stubs).forEach(s => { if (s.y >= o.y - 6 && s.y <= o.y2 + 6) links.add(s.l.id); });
+  } else if (f.type === 'link') links.add(f.id);
+  else return null;
+  return { ids, links, sel: f };
+}
+const vd = { obj: {}, stub: {} };
+function refreshDomain() {
+  const F = domainFocus();
+  DM.spine.forEach(s => { s.m.material.opacity = s.base * (s.y0 > S.cut ? 0.12 : 1); });
+  Object.entries(DM.objs).forEach(([id, o]) => {
+    let f = 1;
+    if (F && F.ids.size && !F.ids.has(id)) f = 0.22;
+    if (F && !F.ids.size) f = 0.45;
+    if (o.y > S.cut) f *= 0.08;
+    vd.obj[id] = f;
+    o.mats.forEach(([m, b]) => { m.opacity = b * f; });
+    const isSel = F && F.sel.id === id;
+    o.lbl.prio = isSel ? 300 : F && F.ids.has(id) ? 200 + o.w : 40 + o.w * 12 + o.y / 10000;
+    o.lbl.op = () => vd.obj[id] > 0.3 ? 1 : 0;
+    o.lbl.show = () => S.mode === 'all' || o.w >= 2 || (F && F.ids.has(id)) || camera.position.distanceTo(controls.target) < 110;
+  });
+  DM.rels.forEach(r => {
+    const on = F && (F.sel.id === r.a || F.sel.id === r.b);
+    const t = Math.max(DM.objs[r.a].y, DM.objs[r.b].y) > S.cut ? 0.1 : 1;
+    r.m.material.opacity = (on ? 0.75 : F ? 0.04 : 0.13) * t;
+  });
+  Object.entries(DM.stubs).forEach(([id, s]) => {
+    let f = S.hiddenKind.has(s.l.k) ? 0 : 1;
+    if (f && F) f = F.links.has(id) ? 1 : 0.18;
+    if (s.y > S.cut) f *= 0.08;
+    vd.stub[id] = f;
+    s.mats.forEach(([m, b]) => { m.opacity = b * f; m.visible = f > 0; });
+    s.lbl.prio = F && F.sel.type === 'link' && F.sel.id === id ? 300 : 45 + s.l.w * 6;
+    s.lbl.op = () => vd.stub[id] > 0.5 ? 1 : 0;
+    s.lbl.show = () => S.mode === 'all' || s.l.w >= 2 || (F && F.links.has(id));
+  });
+  DM.cut.visible = S.cut < Y1; DM.cut.position.y = DM.yD(S.cut);
+}
+
+function pickDomain() {
+  const targets = DM.hits.filter(h => {
+    const u = h.userData;
+    if (u.type === 'link' || u.type === 'portal') { const s = Object.values(DM.stubs).find(s => u.type === 'link' ? s.l.id === u.id : (s.l.a === u.id || s.l.b === u.id)); return s && (u.type === 'portal' || vd.stub[u.id] > 0.15); }
+    return vd.obj[u.id] > 0.15;
+  });
+  const hits = ray.intersectObjects(targets, false);
+  for (const type of ['portal', 'item', 'node', 'link']) { const h = hits.find(h => h.object.userData.type === type); if (h) return h.object.userData; }
+  return null;
+}
+
+function selectInDomain(ref, fly) {
+  if (ref && ref.type === 'portal') return enterDomain(ref.id);
+  if (ref && ref.type === 'domain') { if (ref.id !== S.dom) return enterDomain(ref.id); ref = null; }
+  if (ref && ref.type === 'node' && nodeObj[ref.id].n.d !== S.dom) { enterDomain(nodeObj[ref.id].n.d); return selectInDomain(ref, fly); }
+  if (ref && ref.type === 'item' && itemDom[ref.id] !== S.dom) { enterDomain(itemDom[ref.id]); return selectInDomain(ref, fly); }
+  if (ref && ref.type === 'link' && !DM.stubs[ref.id]) { exitDomain(true); return select(ref, fly); }
+  S.sel = ref; S.hover = null;
+  refresh(); renderPanel(); panel.scrollTop = 0;
+  if (fly && ref) {
+    const k = narrowK();
+    if (ref.type === 'link') flyTo(DM.stubs[ref.id].pos, 160 * k);
+    else flyTo(DM.objs[ref.id].pos, 160 * k);
+  }
+}
+
+function enterDomain(d) {
+  disposeDomain();
+  S.layer = 'domain'; S.dom = d; S.sel = null; S.hover = null; tip.hidden = true;
+  G.visible = false;
+  DM = buildDomain(d);
+  scene.add(DM.grp);
+  $('backBtn').hidden = false;
+  const bd = $('brandDom'); bd.hidden = false; bd.textContent = '› ' + D[d].name; bd.style.setProperty('--c', domColor[d]);
+  $('brandSub').textContent = `${catOf[d].name} › ${subOf[d].name} · 领域视图`;
+  $('hud').textContent = '点击条目查看详情 · 点击右侧光环跳转到其他领域 · Esc 返回全局';
+  document.querySelectorAll('.dom').forEach(b => b.classList.toggle('on', b.dataset.d === d));
+  const v = viewPos('3d');
+  camera.position.copy(v.p.clone().sub(v.t).multiplyScalar(1.7).add(v.t)); controls.target.copy(v.t);
+  refresh(); renderPanel(); panel.scrollTop = 0;
+  flyView('3d');
+}
+
+function exitDomain(silent) {
+  const d = S.dom;
+  disposeDomain();
+  S.layer = 'global'; S.dom = null; S.sel = null; S.hover = null; tip.hidden = true;
+  G.visible = true;
+  $('backBtn').hidden = true; $('brandDom').hidden = true;
+  $('brandSub').textContent = `${Y0} — 今 · ${A.cats.length} 大类 · ${A.cats.reduce((s, c) => s + c.subs.length, 0)} 小类 · ${Object.keys(D).length} 领域`;
+  $('hud').textContent = '拖拽旋转 · 右键平移 · 滚轮缩放 · 点击查看详情 · 双击光柱进入领域视图';
+  if (silent) return;
+  flyView('3d');
+  select({ type: 'domain', id: d }, false);
+}
+
+function go(type, id) {
+  if (type === 'enter') return enterDomain(id);
+  if (type === 'item') { if (S.layer !== 'domain' || S.dom !== itemDom[id]) enterDomain(itemDom[id]); return select({ type, id }, true); }
+  select({ type, id }, true);
+}
+
+const itemRow = it => `<button class="row" data-go="item:${it.id}"><span class="y">${it.y}</span><span class="tt"><span class="dot" style="--c:${laneOf(it.k).color}"></span>${esc(it.t)}<small>${laneOf(it.k).name}${it.k === 'person' || it.k === 'debate' ? ' · ' + spanText(it) : it.by ? ' · ' + esc(it.by) : ''}</small></span><span class="rt">${'●'.repeat(it.w)}</span></button>`;
+
+function renderDomainView(d) {
+  const dm = D[d], c = domColor[d], items = DETAIL[d] || [];
+  const ms = A.nodes.filter(n => n.d === d).sort((a, b) => a.y - b.y);
+  const xl = A.links.filter(l => l.a === d || l.b === d).sort((a, b) => a.y2 - b.y2);
+  const by = k => items.filter(it => it.k === k).sort((a, b) => a.y - b.y);
+  const counts = LANES.map(l => l.k === 'milestone' ? ms.length : by(l.k).length);
+  const sec = (k, title) => { const list = by(k); return list.length ? `<div class="sec"><h3>${title} · ${list.length}</h3><div class="list">${list.map(itemRow).join('')}</div></div>` : ''; };
+  panel.innerHTML = `
+    <div class="crumb">领域视图 · ${esc(catOf[d].name)} › ${esc(subOf[d].name)}<button class="close" data-go="exit">← 返回全局</button></div>
+    <h2 style="color:${c}">${esc(dm.name)}</h2>
+    <p class="lede">${esc(dm.desc)}</p>
+    <div class="stats" style="grid-template-columns:repeat(5,1fr)">${LANES.map((l, i) => `<div class="stat"><b style="color:${l.color || c}">${counts[i]}</b><span>${l.name}</span></div>`).join('')}</div>
+    <div class="lanekey">${LANES.map(l => `<span><span class="dot" style="--c:${l.color || c}"></span>${l.name}</span>`).join('')}<span><span class="dot" style="--c:#9aa6c9"></span>跨领域出口 ${xl.length}</span></div>
+    ${items.length ? '' : `<p class="note">这个领域的著作、人物、思想和辩论还没有补充。目前只显示里程碑和跨领域出口。</p>`}
+    <div class="sec"><h3>怎么读</h3><ul class="how">
+      <li>时间从下往上走，左侧粗柱是这个领域的发展阶段。</li>
+      <li>人物和辩论是竖条：人物从出生到去世，辩论从开始到结束，粉蓝两条代表争论的双方。</li>
+      <li>白色细线是领域内的关联，例如一本书提出了某个思想。</li>
+      <li>右侧光环是通往其他领域的出口，点击就会跳转过去。</li>
+    </ul></div>
+    <div class="sec"><h3>发展阶段 · 活跃度</h3><div class="stages">${dm.stages.map(s => `<div class="stg" style="--c:${c}"><span class="y">${s[0]}–${s[1]}</span><span>${esc(s[2])}</span><span class="heat">${[1, 2, 3].map(i => `<i class="${i <= s[3] ? 'on' : ''}"></i>`).join('')}</span></div>`).join('')}</div></div>
+    ${sec('debate', '辩论')}${sec('idea', '思想')}${sec('work', '经典著作')}${sec('person', '人物')}
+    <div class="sec"><h3>里程碑 · ${ms.length}</h3><div class="list">${ms.map(n => `<button class="row" data-go="node:${n.id}"><span class="y">${n.y}</span><span class="tt"><span class="dot" style="--c:${c}"></span>${esc(n.t)}</span><span class="rt">${'●'.repeat(n.w)}</span></button>`).join('')}</div></div>
+    <div class="sec"><h3>跨领域出口 · ${xl.length}</h3><div class="list">${xl.map(l => linkRow(l, d)).join('') || '<p>暂无</p>'}</div></div>`;
+}
+
+function renderItem(it) {
+  const d = itemDom[it.id], ln = laneOf(it.k);
+  const relIds = new Set(it.rel || []);
+  (DETAIL[d] || []).forEach(o => { if ((o.rel || []).includes(it.id)) relIds.add(o.id); });
+  const related = [...relIds].map(id => itemById[id]).filter(Boolean).sort((a, b) => a.y - b.y);
+  const y2 = it.y2 || Y1;
+  const near = (DETAIL[d] || []).filter(o => o !== it && !relIds.has(o.id) && o.k !== 'person' && o.y >= it.y - 5 && o.y <= (it.k === 'person' ? it.y + 5 : y2 + 5) && (it.k !== 'person' || true)).sort((a, b) => a.y - b.y).slice(0, 6);
+  const lifeWorks = it.k === 'person' ? (DETAIL[d] || []).filter(o => o.k !== 'person' && !relIds.has(o.id) && o.y >= it.y + 18 && o.y <= y2).length : 0;
+  const xl = A.links.filter(l => (l.a === d || l.b === d)).filter(l => { const y = l.a === d ? l.y1 : l.y2; return y >= it.y - 6 && y <= (it.k === 'person' || it.k === 'debate' ? y2 : it.y) + 6; }).sort((a, b) => a.y2 - b.y2);
+  const sib = (DETAIL[d] || []).filter(o => o.k === it.k).sort((a, b) => a.y - b.y), i = sib.indexOf(it);
+  panel.innerHTML = `
+    ${crumb(`${ln.name} · ${esc(D[d].name)} · ${'●'.repeat(it.w)}${'○'.repeat(3 - it.w)}`)}
+    <h2><span class="yr">${spanText(it)}</span>${esc(it.t)}</h2>
+    <div class="meta"><span class="pill" style="--c:${ln.color}">${ln.name}</span>${it.by ? `<span style="color:var(--fg-2);font-size:12.5px">${it.k === 'work' ? '作者' : '提出者'}：${esc(it.by)}</span>` : ''}</div>
+    <p class="lede">${esc(it.x)}</p>
+    ${it.sides ? `<div class="sec"><h3>争论双方</h3><div class="sides">${it.sides.map((s, k) => `<div class="side"><b>${k ? '乙方' : '甲方'}</b>${esc(s)}</div>`).join('')}</div></div>` : ''}
+    ${related.length ? `<div class="sec"><h3>直接相关</h3><div class="list">${related.map(itemRow).join('')}</div></div>` : ''}
+    ${near.length ? `<div class="sec"><h3>${it.k === 'person' ? '同时代' : '同一时期'}的其他条目</h3><div class="list">${near.map(itemRow).join('')}</div></div>` : ''}
+    ${xl.length ? `<div class="sec"><h3>这段时间里的跨领域出口</h3><div class="list">${xl.map(l => linkRow(l, d)).join('')}</div></div>` : ''}
+    <div class="nav2">
+      <button data-go="${i > 0 ? 'item:' + sib[i - 1].id : 'none'}" ${i > 0 ? '' : 'disabled style="opacity:.35"'}>← ${i > 0 ? sib[i - 1].y + ' ' + esc(sib[i - 1].t) : '已是最早'}</button>
+      <button data-go="${i < sib.length - 1 ? 'item:' + sib[i + 1].id : 'none'}" ${i < sib.length - 1 ? '' : 'disabled style="opacity:.35"'}>${i < sib.length - 1 ? sib[i + 1].y + ' ' + esc(sib[i + 1].t) : '已是最新'} →</button>
+    </div>`;
+}
+
+// ---------- 层级树 ----------
+function renderTree() {
+  $('treeBody').innerHTML = A.cats.map(c => {
+    const all = c.subs.flatMap(s => s.domains), shown = all.filter(d => !S.hiddenDom.has(d)).length;
+    return `<div class="cat"><button class="cat-h" style="color:${c.color}" data-tog="${all.join(',')}" aria-pressed="${shown > 0}"><span class="chk ${shown === all.length ? 'full' : shown ? 'part' : ''}"></span>${esc(c.name)}</button>
+      ${c.subs.map(s => {
+        const sh = s.domains.filter(d => !S.hiddenDom.has(d)).length;
+        return `<button class="sub-h" style="color:${c.color}" data-tog="${s.domains.join(',')}" aria-pressed="${sh > 0}"><span class="chk ${sh === s.domains.length ? 'full' : sh ? 'part' : ''}"></span><span style="color:var(--fg-2)">${esc(s.name)}</span></button>
+        ${s.domains.map(d => `<div style="display:flex;align-items:center"><button class="dom${S.sel && S.sel.type === 'domain' && S.sel.id === d ? ' on' : ''}" data-d="${d}" data-go="domain:${d}" style="padding-right:0"><span class="chk ${S.hiddenDom.has(d) ? '' : 'full'}" data-tog="${d}" role="checkbox" aria-checked="${!S.hiddenDom.has(d)}" aria-label="显示${esc(D[d].name)}" style="color:${domColor[d]}"></span>${esc(D[d].name)}<span class="cnt">${DETAIL[d] ? '⤢ ' : ''}${linkCount[d]}</span></button></div>`).join('')}`;
+      }).join('')}</div>`;
+  }).join('');
+}
+$('treeBody').addEventListener('click', ev => {
+  const t = ev.target.closest('[data-tog]');
+  if (!t) return;
+  if (t.classList.contains('chk') || t.classList.contains('cat-h') || t.classList.contains('sub-h')) {
+    ev.stopPropagation(); ev.preventDefault();
+    const ds = t.dataset.tog.split(',');
+    const anyShown = ds.some(d => !S.hiddenDom.has(d));
+    ds.forEach(d => anyShown ? S.hiddenDom.add(d) : S.hiddenDom.delete(d));
+    if (S.sel) { const F = focusSet(); if (F && F.primary && S.hiddenDom.has(F.primary)) S.sel = null; }
+    renderTree(); refresh(); renderPanel();
+  }
+}, true);
+renderTree();
+function toggleTree(open) { $('tree').classList.toggle('open', open); $('treeBtn').setAttribute('aria-expanded', String(open)); }
+$('treeBtn').addEventListener('click', () => toggleTree(!$('tree').classList.contains('open')));
+
+// ---------- 图例 / 视角 / 标注模式 ----------
+$('legend').innerHTML = Object.entries(A.kinds).map(([k, v]) => `<button data-k="${k}" aria-pressed="true"><i style="background:${v.color}"></i>${v.name}</button>`).join('');
+$('legend').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-k]'); if (!b) return;
+  const k = b.dataset.k; S.hiddenKind.has(k) ? S.hiddenKind.delete(k) : S.hiddenKind.add(k);
+  b.setAttribute('aria-pressed', String(!S.hiddenKind.has(k))); refresh();
+});
+$('v3d').onclick = () => flyView('3d'); $('vtop').onclick = () => flyView('top'); $('vfront').onclick = () => flyView('front');
+$('mKey').onclick = () => { S.mode = 'key'; $('mKey').setAttribute('aria-pressed', 'true'); $('mAll').setAttribute('aria-pressed', 'false'); refresh(); };
+$('mAll').onclick = () => { S.mode = 'all'; $('mAll').setAttribute('aria-pressed', 'true'); $('mKey').setAttribute('aria-pressed', 'false'); refresh(); };
+const dolly = k => { const v = camera.position.clone().sub(controls.target).multiplyScalar(k); const len = v.length(); if (len < controls.minDistance || len > controls.maxDistance) return; camera.position.copy(controls.target).add(v); refresh(); };
+$('zin').onclick = () => dolly(0.78); $('zout').onclick = () => dolly(1.28); $('zreset').onclick = () => flyView('3d');
+controls.addEventListener('end', refresh);
+
+// ---------- 时间轴 ----------
+$('eras').innerHTML = A.eras.map(e => `<div class="era" style="left:${yearFrac(e[0]) * 100}%;width:calc(${(yearFrac(e[1]) - yearFrac(e[0])) * 100}% - 2px)" title="${e[0]}–${e[1]}">${esc(e[2])}</div>`).join('');
+$('ticks').innerHTML = [1760, 1840, 1914, 1945, 1991, 2008, 2026].map(y => `<span style="left:${yearFrac(y) * 100}%">${y}</span>`).join('');
+$('cut').addEventListener('input', ev => {
+  const f = ev.target.value / 1000;
+  S.cut = f >= 0.999 ? Y1 : fracToYear(f);
+  $('cutLab').textContent = S.cut >= Y1 ? '全部' : S.cut + ' 年以前';
+  $('past').style.width = (f * 100) + '%';
+  refresh();
+});
+$('past').style.width = '100%';
+
+// ---------- 搜索 ----------
+const index = [];
+Object.keys(D).forEach(d => index.push({ go: 'domain:' + d, t: D[d].name, m: `领域 · ${catOf[d].name} › ${subOf[d].name}`, s: D[d].name + D[d].desc }));
+A.nodes.forEach(n => index.push({ go: 'node:' + n.id, t: `${n.y} ${n.t}`, m: `节点 · ${D[n.d].name}`, s: [n.t, n.x, ...(n.p || []), ...(n.bk || []), ...(n.e || [])].join(' '), extra: [...(n.p || []), ...(n.bk || []), ...(n.e || [])] }));
+A.links.forEach(l => index.push({ go: 'link:' + l.id, t: `${l.y2} ${l.t}`, m: `连线 · ${D[l.a].name} → ${D[l.b].name}`, s: [l.t, l.bg, l.what, l.out, ...(l.p || []), ...(l.bk || []), ...(l.e || [])].join(' '), extra: [...(l.p || []), ...(l.bk || []), ...(l.e || [])] }));
+Object.keys(DETAIL).forEach(d => DETAIL[d].forEach(it => index.push({ go: 'item:' + it.id, t: `${it.y} ${it.t}`, m: `${laneOf(it.k).name} · ${D[d].name}${it.by ? ' · ' + it.by : ''}`, s: [it.t, it.x, it.by || '', ...(it.sides || [])].join(' '), extra: it.by ? [it.by] : [] })));
+$('q').addEventListener('input', ev => {
+  const q = ev.target.value.trim().toLowerCase(), box = $('results');
+  if (!q) { box.hidden = true; return; }
+  const hits = index.map(it => {
+    const inT = it.t.toLowerCase().includes(q), inX = (it.extra || []).find(x => x.toLowerCase().includes(q)), inS = it.s.toLowerCase().includes(q);
+    return { it, score: inT ? 3 : inX ? 2 : inS ? 1 : 0, via: !inT && inX ? inX : '' };
+  }).filter(h => h.score).sort((a, b) => b.score - a.score).slice(0, 14);
+  box.innerHTML = hits.length ? hits.map(h => `<button data-go="${h.it.go}"><div class="r-t">${esc(h.it.t)}</div><div class="r-m">${esc(h.it.m)}${h.via ? ' · 匹配：' + esc(h.via) : ''}</div></button>`).join('') : '<div style="padding:10px 12px;font-size:12px;color:var(--muted)">没有找到。试试人名、书名或年份。</div>';
+  box.hidden = false;
+});
+$('q').addEventListener('keydown', ev => { if (ev.key === 'Escape') { $('results').hidden = true; ev.target.blur(); } if (ev.key === 'Enter') { const b = $('results').querySelector('button'); if (b) b.click(); } });
+document.addEventListener('pointerdown', ev => { if (!ev.target.closest('.search')) $('results').hidden = true; });
+document.addEventListener('keydown', ev => {
+  if (ev.key !== 'Escape' || document.activeElement !== document.body) return;
+  if (S.sel) select(null); else if (S.layer === 'domain') exitDomain();
+});
+
+// ---------- 启动 ----------
+$('loading').remove();
+refresh(); renderPanel();
+requestAnimationFrame(frame);
+})();
+</script>
