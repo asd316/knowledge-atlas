@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>知识脉络图谱</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* 布局：力导向网络铺满中间画布；左侧筛选、右侧条目详情；与 3D 页面共用同一套深色星图配色 */
+:root {
+  --bg: #060912;
+  --bg-2: #0b1122;
+  --panel: rgba(8, 12, 25, 0.92);
+  --line: #1c2744;
+  --line-2: #2a385f;
+  --fg: #e6ebfa;
+  --fg-2: #c3cbe4;
+  --muted: #8a96ba;
+  --faint: #56618a;
+  --accent: #7cc4ff;
+  --f-display: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+  --f-body: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --f-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 14px/1.5 var(--f-body); overflow: hidden; -webkit-font-smoothing: antialiased; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.app {
+  height: 100%; display: grid;
+  grid-template-columns: 228px minmax(0, 1fr) 360px;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "top top top" "side stage panel";
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.top {
+  grid-area: top; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  border-bottom: 1px solid var(--line); background: var(--bg-2);
+}
+.brand { font: 700 19px/1 var(--f-display); letter-spacing: .04em; white-space: nowrap; }
+.brand small { font: 400 12px var(--f-mono); color: var(--muted); margin-left: 8px; letter-spacing: 0; }
+.search { position: relative; flex: 1 1 220px; max-width: 360px; min-width: 0; }
+.search input { width: 100%; background: var(--bg); border: 1px solid var(--line-2); border-radius: 18px; padding: 6px 14px; }
+.search input::placeholder { color: var(--faint); }
+.results { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 20; background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 8px; max-height: 320px; overflow: auto; }
+.seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 8px; overflow: hidden; }
+.seg button { background: none; border: 0; padding: 5px 11px; cursor: pointer; color: var(--fg-2); font-size: 13px; white-space: nowrap; }
+.seg button + button { border-left: 1px solid var(--line-2); }
+.seg button[aria-pressed="true"] { background: #16213f; color: var(--fg); }
+.seg-label { font-size: 12px; color: var(--muted); margin-right: -4px; }
+.to3d { margin-left: auto; color: var(--accent); text-decoration: none; font-size: 13px; border: 1px solid var(--line-2); padding: 5px 12px; border-radius: 8px; white-space: nowrap; }
+.menu { display: none; }
+
+.side { grid-area: side; border-right: 1px solid var(--line); overflow: auto; padding: 14px 14px 24px; display: flex; flex-direction: column; gap: 18px; background: var(--bg); }
+.side h3 { margin: 0 0 6px; font: 600 11px var(--f-body); color: var(--muted); letter-spacing: .12em; }
+.chk { display: flex; align-items: center; gap: 8px; padding: 3px 0; cursor: pointer; font-size: 13px; color: var(--fg-2); }
+.chk input { accent-color: var(--accent); margin: 0; }
+.chk .sw { width: 9px; height: 9px; border-radius: 50%; background: var(--c); flex: none; }
+.chk .sw.hollow { background: none; border: 1.5px solid var(--c); }
+.chk .n { margin-left: auto; font: 11px var(--f-mono); color: var(--faint); }
+.yr { display: flex; align-items: center; gap: 8px; }
+.yr input { flex: 1; min-width: 0; accent-color: var(--accent); }
+.yr output { font: 600 13px var(--f-mono); min-width: 3.4em; text-align: right; }
+.btn { background: #121a33; border: 1px solid var(--line-2); border-radius: 7px; padding: 5px 10px; cursor: pointer; font-size: 13px; }
+.btn:hover { border-color: var(--accent); }
+.hint { font-size: 12px; color: var(--faint); line-height: 1.6; margin: 0; }
+
+.stage { grid-area: stage; position: relative; min-width: 0; overflow: hidden; }
+canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+canvas.hovering { cursor: pointer; }
+.zoom { position: absolute; right: 14px; bottom: 14px; display: flex; flex-direction: column; gap: 6px; }
+.zoom button { width: 34px; height: 34px; border-radius: 50%; background: var(--panel); border: 1px solid var(--line-2); cursor: pointer; }
+.legend-note { position: absolute; left: 14px; bottom: 12px; font-size: 12px; color: var(--faint); pointer-events: none; }
+
+.panel { grid-area: panel; border-left: 1px solid var(--line); overflow: auto; padding: 18px 18px 28px; background: var(--bg); min-width: 0; }
+.eyebrow { font-size: 11px; letter-spacing: .14em; color: var(--muted); margin-bottom: 6px; }
+.panel h2 { font: 700 21px/1.35 var(--f-display); margin: 0 0 8px; text-wrap: balance; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; align-items: center; }
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 2px 9px; border-radius: 10px; border: 1px solid var(--line-2); color: var(--fg-2); background: none; cursor: default; }
+button.chip { cursor: pointer; }
+button.chip:hover { border-color: var(--c, var(--accent)); }
+.chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+.yrs { font: 600 13px var(--f-mono); color: var(--accent); }
+.body { color: var(--fg-2); line-height: 1.75; margin: 0 0 14px; }
+.sides { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.sides div { font-size: 13px; line-height: 1.6; padding: 8px 10px; border-radius: 8px; background: #0e1530; border-top: 2px solid var(--c); }
+.three { display: grid; gap: 10px; margin-bottom: 14px; }
+.three b { display: block; font-size: 11px; letter-spacing: .12em; color: var(--muted); font-weight: 500; }
+.three p { margin: 2px 0 0; color: var(--fg-2); line-height: 1.7; }
+.sec { margin-top: 18px; }
+.sec h4 { margin: 0 0 6px; font: 600 12px var(--f-body); color: var(--muted); letter-spacing: .1em; display: flex; justify-content: space-between; }
+.sec h4 span { font-family: var(--f-mono); color: var(--faint); letter-spacing: 0; }
+.row { display: grid; grid-template-columns: 3.4em minmax(0, 1fr) auto; gap: 8px; align-items: baseline; width: 100%; text-align: left; background: none; border: 0; border-top: 1px solid var(--line); padding: 6px 2px; cursor: pointer; }
+.row:hover { background: #0d1430; }
+.row .y { font: 12px var(--f-mono); color: var(--faint); }
+.row .tt { min-width: 0; font-size: 13px; }
+.row .tt .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--c); margin-right: 6px; vertical-align: 1px; }
+.row .tt .dot.hollow { background: none; border: 1.5px solid var(--c); }
+.row small { color: var(--faint); margin-left: 6px; }
+.row .rt { font: 11px var(--f-mono); color: var(--faint); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0 4px; }
+.stat { border: 1px solid var(--line-2); border-radius: 8px; padding: 8px 10px; }
+.stat b { display: block; font: 600 20px var(--f-mono); font-variant-numeric: tabular-nums; }
+.stat span { font-size: 11px; color: var(--muted); }
+.gid { font: 11px var(--f-mono); color: var(--faint); margin-top: 18px; word-break: break-all; }
+.stubnote { font-size: 13px; color: var(--muted); border: 1px dashed var(--line-2); border-radius: 8px; padding: 8px 10px; margin-bottom: 14px; }
+.issue { font-size: 12px; color: #fbbf24; }
+
+@media (max-width: 860px) {
+  .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(52vh, 1fr) auto; grid-template-areas: "top" "stage" "panel"; }
+  .side { position: fixed; z-index: 30; top: 0; bottom: 0; left: 0; width: min(280px, 86vw); padding-top: calc(14px + env(safe-area-inset-top, 0px)); padding-left: max(14px, env(safe-area-inset-left, 0px)); transform: translateX(-102%); transition: transform .2s; }
+  .side.open { transform: none; box-shadow: 0 0 40px #000; }
+  .menu { display: inline-flex; }
+  .panel { border-left: 0; border-top: 1px solid var(--line); max-height: 40vh; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
+  .to3d { margin-left: 0; }
+  .seg-label { display: none; }
+  .legend-note { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .side { transition: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <button class="btn menu" id="menuBtn" aria-controls="side" aria-expanded="false">筛选</button>
+    <div class="brand">知识脉络图谱<small id="brandStat"></small></div>
+    <div class="search">
+      <input id="q" type="search" placeholder="搜索条目、人物、书、领域" autocomplete="off" aria-label="搜索">
+      <div class="results" id="results" hidden></div>
+    </div>
+    <span class="seg-label">着色</span>
+    <div class="seg" role="group" aria-label="着色方式">
+      <button data-color="domain" aria-pressed="true">按领域</button>
+      <button data-color="kind" aria-pressed="false">按类型</button>
+    </div>
+    <span class="seg-label">范围</span>
+    <div class="seg" role="group" aria-label="显示范围">
+      <button data-depth="0" aria-pressed="true">全部</button>
+      <button data-depth="1" aria-pressed="false">1 步</button>
+      <button data-depth="2" aria-pressed="false">2 步</button>
+    </div>
+    <a class="to3d" href="index.html">3D 视图 ↗</a>
+  </header>
+
+  <aside class="side" id="side">
+    <section>
+      <h3>条目类型</h3>
+      <div id="kindList"></div>
+      <label class="chk"><input type="checkbox" id="optStub" checked><span class="sw hollow" style="--c:var(--muted)"></span>待补条目<span class="n" id="stubN"></span></label>
+    </section>
+    <section>
+      <h3>骨架</h3>
+      <label class="chk"><input type="checkbox" id="optHier" checked>大类、小类节点</label>
+      <label class="chk"><input type="checkbox" id="optIn" checked>条目到领域的归属线</label>
+    </section>
+    <section>
+      <h3>知识包</h3>
+      <div id="packList"></div>
+    </section>
+    <section>
+      <h3>截至年份</h3>
+      <div class="yr"><input type="range" id="year" min="1760" max="2026" step="1" value="2026" aria-label="截至年份"><output id="yearOut">2026</output></div>
+      <p class="hint" style="margin-top:6px"><button class="btn" id="play">▶ 播放生长</button></p>
+    </section>
+    <p class="hint">拖动画布平移，滚轮缩放，拖动节点可以把它拉开。点击条目查看详情；选“1 步”或“2 步”只看它周围的局部图谱。空心点是被提到、但还没写说明的待补条目。</p>
+  </aside>
+
+  <main class="stage" id="stage">
+    <canvas id="cv" aria-label="知识图谱网络"></canvas>
+    <div class="legend-note" id="note"></div>
+    <div class="zoom">
+      <button id="zIn" aria-label="放大">+</button>
+      <button id="zOut" aria-label="缩小">−</button>
+      <button id="zFit" aria-label="显示全部">⤢</button>
+    </div>
+  </main>
+
+  <aside class="panel" id="panel" aria-live="polite"></aside>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="data.js"></script>
+<script src="detail.js"></script>
+<script src="atlas-core.js"></script>
+<script src="packs/climate.js"></script>
+<script>
+(function () {
+'use strict';
+const G = Atlas.build();
+if (G.issues.length) console.warn('[atlas] 数据检查：\n' + G.issues.map(i => `${i.level} [${i.pack}] ${i.msg}`).join('\n'));
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// ---------- 颜色 ----------
+const domColor = {};
+G.categories.forEach(c => c.clusters.forEach((s, si) => s.domains.forEach((d, di) => {
+  const h = d3.hsl(c.color); h.h += (si - 1) * 5; h.l = Math.min(0.82, Math.max(0.45, h.l + (di - 0.6) * 0.08));
+  domColor[d] = h.formatHex();
+})));
+Object.keys(G.domains).forEach(d => { domColor[d] = domColor[d] || '#8a96ba'; });
+const MILESTONE = '#e6ebfa';
+const kindColor = k => (G.kinds[k] && G.kinds[k].color) || MILESTONE;
+const driverColor = drv => (G.drivers[drv] && G.drivers[drv].color) || '#e2e8f0';
+
+// ---------- 节点与边 ----------
+const nodes = [], byId = new Map(), edges = [], adj = new Map();
+const addNode = n => { nodes.push(n); byId.set(n.id, n); adj.set(n.id, new Set()); return n; };
+const addEdge = (s, t, r, extra) => {
+  if (!byId.has(s) || !byId.has(t) || s === t) return;
+  edges.push(Object.assign({ s, t, r }, extra || {}));
+};
+G.categories.forEach(c => {
+  addNode({ id: 'cat:' + c.id, type: 'category', t: c.name, color: c.color, pack: c.pack });
+  c.clusters.forEach(s => {
+    addNode({ id: 'cl:' + s.id, type: 'cluster', t: s.name, color: c.color, cat: c, pack: s.pack });
+    addEdge('cat:' + c.id, 'cl:' + s.id, 'tree');
+    s.domains.forEach(d => {
+      addNode({ id: 'dom:' + d, type: 'domain', t: G.domains[d].name, color: domColor[d], d, pack: G.domains[d].pack });
+      addEdge('cl:' + s.id, 'dom:' + d, 'tree');
+    });
+  });
+});
+Object.keys(G.domains).forEach(d => { if (!byId.has('dom:' + d)) addNode({ id: 'dom:' + d, type: 'domain', t: G.domains[d].name, color: domColor[d], d, pack: G.domains[d].pack }); });
+G.entries.forEach(e => addNode({ id: e.gid, type: 'entry', e, t: e.t, k: e.k, y: e.y, pack: e.pack }));
+G.entries.forEach(e => e.d.forEach(d => addEdge(e.gid, 'dom:' + d, e.k === 'link' ? 'link' : 'in', e.k === 'link' ? { color: driverColor(e.drv) } : null)));
+G.relations.forEach(r => addEdge(r.s, r.t, r.r));
+edges.forEach(ed => { adj.get(ed.s).add(ed.t); adj.get(ed.t).add(ed.s); });
+nodes.forEach(n => {
+  n.deg = adj.get(n.id).size;
+  if (n.type === 'category') n.r = 13;
+  else if (n.type === 'cluster') n.r = 8.5;
+  else if (n.type === 'domain') n.r = 7 + Math.min(6, Math.sqrt(n.deg) * 0.55);
+  else n.r = (n.e.stub ? 2.2 : 2.6) + Math.min(5, Math.sqrt(n.deg) * 0.9) + ((n.e.w || 1) - 1) * 0.5;
+});
+
+// ---------- 状态 ----------
+const S = {
+  color: 'domain', depth: 0, sel: null, hover: null, year: 2026,
+  kinds: {}, packs: {}, stub: true, hier: true, inLines: true
+};
+const entryKinds = [...new Set([...G.entries.values()].map(e => e.k))];
+const kindOrder = Object.keys(G.kinds).filter(k => !G.kinds[k].abstract && entryKinds.includes(k));
+kindOrder.forEach(k => { S.kinds[k] = true; });
+G.packs.forEach(p => { S.packs[p.id] = true; });
+
+function nodeColor(n) {
+  if (n.type !== 'entry') return n.color;
+  if (S.color === 'kind') return n.k === 'link' ? driverColor(n.e.drv) : kindColor(n.k);
+  if (n.k === 'link') return driverColor(n.e.drv);
+  const d = n.e.d[0];
+  return d ? domColor[d] : '#8a96ba';
+}
+
+// ---------- 可见集合 ----------
+let visNodes = [], visEdges = [], visSet = new Set();
+function baseVisible(n) {
+  if (n.type === 'category' || n.type === 'cluster') return S.hier && S.packs[n.pack] !== false;
+  if (n.type === 'domain') return S.packs[n.pack] !== false;
+  const e = n.e;
+  if (e.stub) return S.stub && S.kinds[e.k] !== false;
+  if (!S.kinds[e.k] || !S.packs[e.pack]) return false;
+  if (e.y && e.y > S.year) return false;
+  return true;
+}
+function edgeVisible(ed) {
+  if (ed.r === 'in') return S.inLines;
+  return true;
+}
+function computeVisible() {
+  let set = new Set(nodes.filter(baseVisible).map(n => n.id));
+  let es = edges.filter(ed => set.has(ed.s) && set.has(ed.t) && edgeVisible(ed));
+  // 待补条目只在有可见邻居时出现
+  const touched = new Set(); es.forEach(ed => { touched.add(ed.s); touched.add(ed.t); });
+  set = new Set([...set].filter(id => !(byId.get(id).e && byId.get(id).e.stub) || touched.has(id)));
+  if (S.depth > 0 && S.sel && set.has(S.sel)) {
+    const near = new Set([S.sel]); let frontier = [S.sel];
+    const a = new Map(); es.forEach(ed => { (a.get(ed.s) || a.set(ed.s, []).get(ed.s)).push(ed.t); (a.get(ed.t) || a.set(ed.t, []).get(ed.t)).push(ed.s); });
+    for (let i = 0; i < S.depth; i++) {
+      const next = [];
+      frontier.forEach(id => (a.get(id) || []).forEach(t => { if (!near.has(t)) { near.add(t); next.push(t); } }));
+      frontier = next;
+    }
+    set = near;
+  }
+  visSet = set;
+  visNodes = nodes.filter(n => set.has(n.id));
+  visEdges = es.filter(ed => set.has(ed.s) && set.has(ed.t));
+}
+
+// ---------- 力导向 ----------
+const DIST = { tree: 46, in: 24, link: 36, rel: 26, person: 30, work: 30 };
+const STR = { tree: 0.7, in: 0.18, link: 0.25, rel: 0.5, person: 0.35, work: 0.35 };
+const linkForce = d3.forceLink().id(n => n.id).distance(ed => DIST[ed.r] || 30).strength(ed => STR[ed.r] || 0.3);
+const sim = d3.forceSimulation()
+  .force('link', linkForce)
+  .force('charge', d3.forceManyBody().strength(n => n.type === 'entry' ? -26 - n.r * 3 : -180).distanceMax(420))
+  .force('collide', d3.forceCollide(n => n.r + 1.5))
+  .force('x', d3.forceX(0).strength(0.035))
+  .force('y', d3.forceY(0).strength(0.035))
+  .alphaDecay(0.03)
+  .on('tick', draw);
+
+function rebuild(alpha) {
+  computeVisible();
+  visNodes.forEach(n => {
+    if (n.x != null) return;
+    const nb = [...adj.get(n.id)].map(id => byId.get(id)).find(m => m.x != null);
+    n.x = (nb ? nb.x : 0) + (Math.random() - 0.5) * 30; n.y = (nb ? nb.y : 0) + (Math.random() - 0.5) * 30;
+  });
+  visEdges.forEach(ed => { ed.source = ed.s; ed.target = ed.t; });
+  sim.nodes(visNodes); linkForce.links(visEdges);
+  sim.alpha(alpha == null ? 0.5 : alpha).restart();
+  $('brandStat').textContent = `${visNodes.length} 点 · ${visEdges.length} 边`;
+  draw();
+}
+
+// ---------- 画布 ----------
+const cv = $('cv'), ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1, T = d3.zoomIdentity;
+function resize() {
+  const r = cv.getBoundingClientRect();
+  W = r.width; H = r.height; DPR = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  draw();
+}
+const sx = x => T.applyX(x), sy = y => T.applyY(y);
+
+function focusSet() {
+  const f = S.hover || S.sel;
+  if (!f || !visSet.has(f)) return null;
+  const s = new Set([f]); visEdges.forEach(ed => { const a = ed.source.id, b = ed.target.id; if (a === f) s.add(b); else if (b === f) s.add(a); });
+  return s;
+}
+
+function draw() {
+  if (!W) return;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = '#060912'; ctx.fillRect(0, 0, W, H);
+  const f = focusSet(), focusId = S.hover || S.sel;
+  const k = T.k;
+
+  // 边
+  ctx.lineCap = 'round';
+  visEdges.forEach(ed => {
+    const a = ed.source, b = ed.target;
+    if (a.x == null) return;
+    const hot = f && (a.id === focusId || b.id === focusId);
+    let alpha = ed.r === 'tree' ? 0.28 : ed.r === 'in' ? 0.07 : ed.r === 'link' ? 0.32 : 0.2;
+    if (f) alpha = hot ? 0.85 : alpha * 0.25;
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = ed.color || (ed.r === 'tree' ? a.color : '#9fb0dd');
+    ctx.lineWidth = (ed.r === 'tree' ? 1.4 : ed.r === 'link' ? 1.2 : 0.8) * (hot ? 1.6 : 1);
+    ctx.beginPath(); ctx.moveTo(sx(a.x), sy(a.y)); ctx.lineTo(sx(b.x), sy(b.y)); ctx.stroke();
+  });
+
+  // 点
+  visNodes.forEach(n => {
+    if (n.x == null) return;
+    const x = sx(n.x), y = sy(n.y), r = Math.max(1.4, n.r * Math.sqrt(k));
+    if (x < -40 || y < -40 || x > W + 40 || y > H + 40) return;
+    const c = nodeColor(n), dim = f && !f.has(n.id);
+    ctx.globalAlpha = dim ? 0.12 : 1;
+    if (n.type !== 'entry') {
+      ctx.globalAlpha = dim ? 0.15 : 0.22; ctx.fillStyle = c;
+      ctx.beginPath(); ctx.arc(x, y, r * 2.1, 0, 7); ctx.fill();
+      ctx.globalAlpha = dim ? 0.2 : 1;
+    }
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 7);
+    if (n.e && n.e.stub) { ctx.strokeStyle = c; ctx.lineWidth = 1.2; ctx.globalAlpha *= 0.8; ctx.stroke(); }
+    else if (n.k === 'link') { ctx.fillStyle = '#060912'; ctx.fill(); ctx.strokeStyle = c; ctx.lineWidth = 1.8; ctx.stroke(); }
+    else { ctx.fillStyle = c; ctx.fill(); }
+    if (n.type === 'cluster' || n.type === 'category') { ctx.strokeStyle = '#060912'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r * 0.45, 0, 7); ctx.stroke(); }
+    if (n.id === S.sel) { ctx.globalAlpha = 1; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(x, y, r + 3.5, 0, 7); ctx.stroke(); }
+  });
+
+  // 标签：骨架节点常显，条目随缩放逐渐出现，焦点邻居总是显示
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  const boxes = [];
+  const order = visNodes.slice().sort((a, b) => labelRank(b, f) - labelRank(a, f));
+  for (const n of order) {
+    if (n.x == null) continue;
+    const rank = labelRank(n, f);
+    if (rank <= 0) break;
+    const x = sx(n.x), y = sy(n.y) + Math.max(1.4, n.r * Math.sqrt(k)) + 3;
+    if (x < 0 || y < 0 || x > W || y > H) continue;
+    const big = n.type === 'category' ? 15 : n.type === 'cluster' ? 12.5 : n.type === 'domain' ? 13 : 11.5;
+    ctx.font = `${n.type === 'category' ? 700 : n.type === 'entry' ? 400 : 600} ${big}px ${n.type === 'category' ? "'Noto Serif SC', serif" : "'Noto Sans SC', sans-serif"}`;
+    const text = n.t.length > 16 ? n.t.slice(0, 15) + '…' : n.t;
+    const w = ctx.measureText(text).width, box = [x - w / 2 - 2, y - 1, x + w / 2 + 2, y + big + 2];
+    if (boxes.some(b => box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1])) continue;
+    boxes.push(box);
+    const dim = f && !f.has(n.id);
+    ctx.globalAlpha = dim ? 0.18 : n.type === 'entry' ? Math.min(1, 0.45 + rank / 10) : 1;
+    ctx.lineWidth = 3; ctx.strokeStyle = '#060912'; ctx.strokeText(text, x, y);
+    ctx.fillStyle = n.type === 'entry' ? (n.e.stub ? '#8a96ba' : '#c3cbe4') : n.color;
+    ctx.fillText(text, x, y);
+  }
+  ctx.globalAlpha = 1;
+}
+function labelRank(n, f) {
+  if (f && f.has(n.id)) return 20 + (n.id === (S.hover || S.sel) ? 5 : 0);
+  if (n.type === 'category') return 18;
+  if (n.type === 'domain') return 16;
+  if (n.type === 'cluster') return T.k > 0.55 ? 12 : 0;
+  const size = n.r * T.k;
+  return size > 6.5 ? size : (T.k > 1.6 ? 1 : 0);
+}
+
+// ---------- 交互 ----------
+function nodeAt(px, py) {
+  const [x, y] = T.invert([px, py]);
+  let best = null, bd = Infinity;
+  for (const n of visNodes) {
+    const d = Math.hypot(n.x - x, n.y - y), r = n.r * Math.sqrt(T.k) / T.k + 4 / T.k;
+    if (d < r && d < bd) { bd = d; best = n; }
+  }
+  return best;
+}
+const zoom = d3.zoom().scaleExtent([0.15, 8]).on('zoom', ev => { T = ev.transform; draw(); });
+const drag = d3.drag()
+  .subject(ev => { const n = nodeAt(ev.x, ev.y); return n ? Object.assign(n, { _sx: ev.x, _sy: ev.y }) : null; })
+  .on('start', ev => { if (!ev.active) sim.alphaTarget(0.25).restart(); ev.subject.fx = ev.subject.x; ev.subject.fy = ev.subject.y; })
+  .on('drag', ev => { const [x, y] = T.invert([ev.x, ev.y]); ev.subject.fx = x; ev.subject.fy = y; })
+  .on('end', ev => { if (!ev.active) sim.alphaTarget(0); ev.subject.fx = null; ev.subject.fy = null; });
+d3.select(cv).call(drag).call(zoom).on('dblclick.zoom', null);
+cv.addEventListener('pointermove', ev => {
+  const r = cv.getBoundingClientRect(), n = nodeAt(ev.clientX - r.left, ev.clientY - r.top);
+  const id = n ? n.id : null;
+  if (id !== S.hover) { S.hover = id; cv.classList.toggle('hovering', !!n); draw(); }
+});
+cv.addEventListener('pointerleave', () => { if (S.hover) { S.hover = null; draw(); } });
+cv.addEventListener('click', ev => {
+  const r = cv.getBoundingClientRect(), n = nodeAt(ev.clientX - r.left, ev.clientY - r.top);
+  select(n ? n.id : null, false);
+});
+
+function select(id, center) {
+  S.sel = id;
+  if (S.depth > 0) rebuild(0.4); else draw();
+  render();
+  if (center && id) {
+    const n = byId.get(id);
+    if (n.x == null) return;
+    const kk = Math.max(T.k, 1.4);
+    d3.select(cv).transition().duration(matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 600)
+      .call(zoom.transform, d3.zoomIdentity.translate(W / 2 - n.x * kk, H / 2 - n.y * kk).scale(kk));
+  }
+}
+function fit(duration) {
+  if (!visNodes.length) return;
+  const xs = visNodes.map(n => n.x), ys = visNodes.map(n => n.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const kk = Math.min(4, 0.9 * Math.min(W / (x1 - x0 || 1), H / (y1 - y0 || 1)));
+  const t = d3.zoomIdentity.translate(W / 2 - (x0 + x1) / 2 * kk, H / 2 - (y0 + y1) / 2 * kk).scale(kk);
+  d3.select(cv).transition().duration(duration || 0).call(zoom.transform, t);
+}
+$('zIn').onclick = () => d3.select(cv).transition().duration(250).call(zoom.scaleBy, 1.4);
+$('zOut').onclick = () => d3.select(cv).transition().duration(250).call(zoom.scaleBy, 1 / 1.4);
+$('zFit').onclick = () => fit(400);
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && document.activeElement !== $('q')) select(null); });
+
+// ---------- 面板 ----------
+const kindName = k => (G.kinds[k] && G.kinds[k].name) || k;
+const span = e => e.k === 'link' ? `${e.y1}→${e.y2}` : e.y2 ? `${e.y}–${e.y2}` : (e.k === 'person' || e.k === 'debate') && e.y ? `${e.y}–` : (e.y || '');
+const dotOf = n => `<span class="dot${n.e && n.e.stub ? ' hollow' : ''}" style="--c:${nodeColor(n)}"></span>`;
+const rowOf = n => `<button class="row" data-id="${esc(n.id)}"><span class="y">${n.e ? esc(n.e.k === 'link' ? n.e.y1 : n.e.y || '') : ''}</span><span class="tt">${dotOf(n)}${esc(n.t)}<small>${n.e ? kindName(n.k) + (n.e.stub ? ' · 待补' : '') : { category: '大类', cluster: '小类', domain: '领域' }[n.type]}</small></span><span class="rt">${n.deg}</span></button>`;
+const domChip = d => `<button class="chip" data-id="dom:${d}" style="--c:${domColor[d]}"><span class="dot"></span>${esc(G.domains[d].name)}</button>`;
+const packName = id => (G.packs.find(p => p.id === id) || { name: id }).name;
+
+function neighborsHtml(id) {
+  const ns = [...adj.get(id)].map(x => byId.get(x)).filter(n => n.type === 'entry');
+  if (!ns.length) return '';
+  const groups = {};
+  ns.forEach(n => { (groups[n.k] = groups[n.k] || []).push(n); });
+  return Object.entries(groups).sort((a, b) => kindOrder.indexOf(a[0]) - kindOrder.indexOf(b[0])).map(([k, list]) =>
+    `<div class="sec"><h4>${kindName(k)}<span>${list.length}</span></h4>${list.sort((a, b) => (a.e.y || 0) - (b.e.y || 0)).map(rowOf).join('')}</div>`).join('');
+}
+
+function render() {
+  const P = $('panel');
+  const n = S.sel && byId.get(S.sel);
+  if (!n) return renderOverview(P);
+  if (n.type !== 'entry') return renderHub(P, n);
+  const e = n.e;
+  let h = `<div class="eyebrow">${kindName(e.k)}${e.stub ? ' · 待补' : ''}</div><h2>${esc(e.t)}</h2><div class="meta">`;
+  if (span(e)) h += `<span class="yrs">${span(e)}</span>`;
+  e.d.forEach(d => { h += domChip(d); });
+  if (e.k === 'link') h += `<span class="chip" style="--c:${driverColor(e.drv)}"><span class="dot"></span>${esc((G.drivers[e.drv] || {}).name || e.drv)}</span>`;
+  if (e.by) h += `<span class="chip">${esc(e.by)}</span>`;
+  h += '</div>';
+  if (e.stub) h += `<div class="stubnote">这个条目在 ${n.deg} 处被提到，还没有说明。补上之后，它会把这些地方连成一个枢纽。</div>`;
+  if (e.x) h += `<p class="body">${esc(e.x)}</p>`;
+  if (e.sides) h += `<div class="sides"><div style="--c:#f9a8d4">${esc(e.sides[0])}</div><div style="--c:#7dd3fc">${esc(e.sides[1])}</div></div>`;
+  if (e.k === 'link') h += `<div class="three">${[['背景', e.bg], ['经过', e.what], ['后果', e.out]].filter(x => x[1]).map(([a, b]) => `<div><b>${a}</b><p>${esc(b)}</p></div>`).join('')}</div>`;
+  if (e.e && e.e.length) h += `<div class="sec"><h4>相关事件<span>${e.e.length}</span></h4>${e.e.map(x => `<div class="row" style="cursor:default"><span class="y"></span><span class="tt">${esc(x)}</span><span></span></div>`).join('')}</div>`;
+  h += neighborsHtml(n.id);
+  const hubs = [...adj.get(n.id)].map(x => byId.get(x)).filter(m => m.type === 'domain' && !e.d.includes(m.d));
+  if (hubs.length) h += `<div class="sec"><h4>领域<span>${hubs.length}</span></h4>${hubs.map(rowOf).join('')}</div>`;
+  h += `<div class="gid">${esc(e.gid)} · 来自 ${esc(packName(e.pack))}${e.merged ? ' · 合并了 ' + esc(e.merged.join('、')) : ''}${e.patchedBy ? ' · 被 ' + esc(e.patchedBy.join('、')) + ' 补充' : ''}</div>`;
+  P.innerHTML = h; P.scrollTop = 0;
+}
+
+function renderHub(P, n) {
+  let h = `<div class="eyebrow">${{ category: '大类', cluster: '小类', domain: '领域' }[n.type]}</div><h2>${esc(n.t)}</h2>`;
+  if (n.type === 'domain') {
+    const dm = G.domains[n.d], tpl = G.templates[dm.template];
+    h += `<div class="meta"><span class="chip">${esc(tpl.name || tpl.id)}模板</span><span class="chip">${esc(packName(dm.pack))}</span></div>`;
+    if (dm.desc) h += `<p class="body">${esc(dm.desc)}</p>`;
+    if (dm.pre) h += `<p class="body" style="font-size:13px;color:var(--muted)">${esc(dm.pre)}</p>`;
+    if (dm.stages) h += `<div class="sec"><h4>阶段<span>${dm.stages.length}</span></h4>${dm.stages.map(s => `<div class="row" style="cursor:default"><span class="y">${s[0]}</span><span class="tt">${esc(s[2])}<small>至 ${s[1]}</small></span><span class="rt">${'●'.repeat(s[3])}</span></div>`).join('')}</div>`;
+    h += `<div class="sec"><h4>泳道<span>${tpl.lanes.length}</span></h4><div class="meta">${tpl.lanes.map(k => `<span class="chip" style="--c:${kindColor(k)}"><span class="dot"></span>${esc(kindName(k))}</span>`).join('')}</div></div>`;
+  }
+  const kids = [...adj.get(n.id)].map(x => byId.get(x)).filter(m => m.type !== 'entry');
+  if (kids.length) h += `<div class="sec"><h4>上下级<span>${kids.length}</span></h4>${kids.map(rowOf).join('')}</div>`;
+  h += neighborsHtml(n.id);
+  P.innerHTML = h; P.scrollTop = 0;
+}
+
+function renderOverview(P) {
+  const ents = [...G.entries.values()], real = ents.filter(e => !e.stub), stubs = ents.filter(e => e.stub);
+  const hubs = nodes.filter(n => n.type === 'entry' && !n.e.stub && n.k !== 'link').sort((a, b) => b.deg - a.deg).slice(0, 8);
+  const wanted = nodes.filter(n => n.e && n.e.stub).sort((a, b) => b.deg - a.deg).slice(0, 8);
+  let h = `<div class="eyebrow">图谱总览</div><h2>${real.length} 个条目，${G.relations.length} 条关联</h2>
+    <p class="body">每个点是一个条目：里程碑、人物、著作、思想、辩论，或者跨领域的联动（空心环）。同一个人物或著作只出现一次，所以经济学和货币学会在凯恩斯、弗里德曼身上连到一起。</p>
+    <div class="stats">
+      <div class="stat"><b>${Object.keys(G.domains).length}</b><span>领域</span></div>
+      <div class="stat"><b>${G.packs.length}</b><span>知识包</span></div>
+      <div class="stat"><b>${stubs.length}</b><span>待补条目</span></div>
+    </div>`;
+  if (G.issues.length) h += `<p class="issue">数据检查发现 ${G.issues.length} 个问题，详见浏览器控制台。</p>`;
+  h += `<div class="sec"><h4>连接最多的条目<span>关联数</span></h4>${hubs.map(rowOf).join('')}</div>`;
+  h += `<div class="sec"><h4>最常被提到、还没写的<span>提及数</span></h4>${wanted.map(rowOf).join('')}</div>`;
+  h += `<div class="sec"><h4>知识包<span>${G.packs.length}</span></h4>${G.packs.map(p => `<div class="row" style="cursor:default"><span class="y">${esc(p.version || '')}</span><span class="tt">${esc(p.name)}<small>${esc(p.id)}${p.requires ? ' · 依赖 ' + esc(p.requires.join('、')) : ''}</small></span><span class="rt">${real.filter(e => e.pack === p.id).length}</span></div>`).join('')}</div>`;
+  P.innerHTML = h;
+}
+
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-id]');
+  if (!b) return;
+  const id = b.dataset.id;
+  if (!visSet.has(id)) { // 被筛掉的条目：先放宽筛选
+    const n = byId.get(id);
+    if (n.e) { S.kinds[n.k] = true; S.packs[n.e.pack] = true; if (n.e.stub) S.stub = true; if (n.e.y > S.year) S.year = 2026; }
+    S.hier = S.hier || n.type === 'category' || n.type === 'cluster';
+    syncControls(); S.sel = id; rebuild(0.6);
+  }
+  $('results').hidden = true;
+  select(id, true);
+});
+
+// ---------- 筛选控件 ----------
+function syncControls() {
+  document.querySelectorAll('[data-kind]').forEach(i => { i.checked = !!S.kinds[i.dataset.kind]; });
+  document.querySelectorAll('[data-pack]').forEach(i => { i.checked = !!S.packs[i.dataset.pack]; });
+  $('optStub').checked = S.stub; $('optHier').checked = S.hier; $('optIn').checked = S.inLines;
+  $('year').value = S.year; $('yearOut').textContent = S.year;
+}
+const countKind = k => [...G.entries.values()].filter(e => e.k === k && !e.stub).length;
+$('kindList').innerHTML = kindOrder.map(k => `<label class="chk"><input type="checkbox" data-kind="${k}" checked><span class="sw${k === 'link' ? ' hollow' : ''}" style="--c:${k === 'link' ? '#e2e8f0' : kindColor(k)}"></span>${esc(kindName(k))}<span class="n">${countKind(k)}</span></label>`).join('');
+$('stubN').textContent = [...G.entries.values()].filter(e => e.stub).length;
+$('packList').innerHTML = G.packs.map(p => `<label class="chk"><input type="checkbox" data-pack="${esc(p.id)}" checked>${esc(p.name)}<span class="n">${esc(p.id)}</span></label>`).join('');
+$('side').addEventListener('change', ev => {
+  const i = ev.target;
+  if (i.dataset.kind) S.kinds[i.dataset.kind] = i.checked;
+  else if (i.dataset.pack) S.packs[i.dataset.pack] = i.checked;
+  else if (i.id === 'optStub') S.stub = i.checked;
+  else if (i.id === 'optHier') S.hier = i.checked;
+  else if (i.id === 'optIn') S.inLines = i.checked;
+  rebuild(0.5);
+});
+$('year').addEventListener('input', ev => { S.year = +ev.target.value; $('yearOut').textContent = S.year; rebuild(0.25); });
+let playing = null;
+$('play').onclick = () => {
+  if (playing) { clearInterval(playing); playing = null; $('play').textContent = '▶ 播放生长'; return; }
+  S.year = 1760; $('play').textContent = '■ 停止';
+  playing = setInterval(() => {
+    S.year = Math.min(2026, S.year + 3); syncControls(); rebuild(0.3);
+    if (S.year >= 2026) { clearInterval(playing); playing = null; $('play').textContent = '▶ 播放生长'; }
+  }, 90);
+};
+document.querySelectorAll('[data-color]').forEach(b => b.onclick = () => {
+  S.color = b.dataset.color;
+  document.querySelectorAll('[data-color]').forEach(x => x.setAttribute('aria-pressed', x === b));
+  draw(); render();
+});
+document.querySelectorAll('[data-depth]').forEach(b => b.onclick = () => {
+  S.depth = +b.dataset.depth;
+  document.querySelectorAll('[data-depth]').forEach(x => x.setAttribute('aria-pressed', x === b));
+  rebuild(0.5);
+  setTimeout(() => fit(500), S.depth ? 700 : 900);
+});
+$('menuBtn').onclick = () => { const o = $('side').classList.toggle('open'); $('menuBtn').setAttribute('aria-expanded', o); };
+
+// ---------- 搜索 ----------
+const searchIdx = nodes.map(n => ({ n, s: (n.t + ' ' + (n.e && n.e.by || '') + ' ' + (n.e && (n.e.aka || []).join(' ') || '')).toLowerCase() }));
+$('q').addEventListener('input', ev => {
+  const q = ev.target.value.trim().toLowerCase(), R = $('results');
+  if (!q) { R.hidden = true; return; }
+  const hits = searchIdx.filter(x => x.s.includes(q)).sort((a, b) => b.n.deg - a.n.deg).slice(0, 12);
+  R.innerHTML = hits.length ? hits.map(x => rowOf(x.n)).join('') : '<div class="hint" style="padding:10px">没有找到</div>';
+  R.hidden = false;
+});
+$('q').addEventListener('keydown', ev => {
+  if (ev.key === 'Enter') { const b = $('results').querySelector('[data-id]'); if (b) b.click(); }
+  if (ev.key === 'Escape') { $('results').hidden = true; ev.target.blur(); }
+});
+
+// ---------- 启动：先离线算好布局，首帧就是排好的网络 ----------
+window.addEventListener('resize', resize);
+computeVisible();
+visEdges.forEach(ed => { ed.source = ed.s; ed.target = ed.t; });
+sim.stop().nodes(visNodes); linkForce.links(visEdges);
+for (let i = 0; i < 320; i++) sim.tick();
+resize();
+fit(0);
+rebuild(0.05);
+render();
+$('note').textContent = '空心环 = 跨领域联动 · 空心点 = 待补条目';
+})();
+</script>
+</body>
+</html>

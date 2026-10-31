@@ -285,6 +285,7 @@ button { font: inherit; color: inherit; }
     <div class="seg" role="group" aria-label="标注密度">
       <button id="mKey" aria-pressed="true">仅关键点</button><button id="mAll" aria-pressed="false">全部标注</button>
     </div>
+    <a class="seg" id="toGraph" href="graph.html" style="padding:5px 12px;color:var(--accent);text-decoration:none;font-size:13px">图谱视图 ↗</a>
     <div class="legend" id="legend" aria-label="连线类型筛选"></div>
   </header>
 
@@ -319,6 +320,9 @@ button { font: inherit; color: inherit; }
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="data.js"></script>
 <script src="detail.js"></script>
+<script src="atlas-core.js"></script>
+<script src="packs/climate.js"></script>
+<script>Atlas.applyLegacy();</script>
 <script>
 (function () {
 'use strict';

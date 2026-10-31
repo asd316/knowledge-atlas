@@ -13,13 +13,20 @@ const V = path.join(__dirname, 'vendor/'); // three.min.js + OrbitControls.js（
   await p.route('**/*', r => {
     const u = r.request().url();
     if (u.includes('three.min.js')) return r.fulfill({ body: fs.readFileSync(V + 'three.min.js'), contentType: 'text/javascript' });
+    if (u.includes('d3.min.js')) return r.fulfill({ body: fs.readFileSync(V + 'd3.min.js'), contentType: 'text/javascript' });
     if (u.includes('OrbitControls')) return r.fulfill({ body: fs.readFileSync(V + 'OrbitControls.js'), contentType: 'text/javascript' });
-    if (u.endsWith('/detail.js')) return r.fulfill({ body: fs.readFileSync(dir + 'detail.js'), contentType: 'text/javascript' });
-    if (u.endsWith('/data.js')) return r.fulfill({ body: fs.readFileSync(dir + 'data.js'), contentType: 'text/javascript' });
-    if (u.startsWith('http://x/')) return r.fulfill({ body: '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>[hidden]{display:none!important}body{margin:0}</style></head><body>' + fs.readFileSync(dir + 'index.html', 'utf8') + '</body></html>', contentType: 'text/html' });
+    if (u.startsWith('http://x/')) {
+      const f = path.join(dir, new URL(u).pathname);
+      if (!fs.existsSync(f)) return r.abort();
+      if (f.endsWith('.js')) return r.fulfill({ body: fs.readFileSync(f), contentType: 'text/javascript' });
+      // 页面按 Artifact 片段编写，这里补上发布时的外壳
+      const html = fs.readFileSync(f, 'utf8');
+      if (/^<!doctype/i.test(html)) return r.fulfill({ body: html, contentType: 'text/html' });
+      return r.fulfill({ body: '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>[hidden]{display:none!important}body{margin:0}</style></head><body>' + html + '</body></html>', contentType: 'text/html' });
+    }
     return r.abort();
   });
-  await p.goto('http://x/index.html');
+  await p.goto('http://x/' + (process.env.PAGE || 'index.html'));
   await p.waitForTimeout(2500);
   if (action) await p.evaluate(action);
   await p.waitForTimeout(1500);
