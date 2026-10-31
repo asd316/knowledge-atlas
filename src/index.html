@@ -153,6 +153,13 @@ button { font: inherit; color: inherit; }
 .lb.xl-l { font-size: 11px; color: var(--fg-2); text-shadow: 0 0 4px #000, 0 0 8px #000; }
 .lb.xl-l em { font-style: normal; font-weight: 700; color: var(--c); }
 .lb.dom-l .xp { color: var(--c); font-weight: 400; margin-left: 2px; }
+/* 视图切换：常驻顶栏，不折叠 */
+.views { display: inline-flex; gap: 3px; padding: 3px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--bg); flex: none; }
+.views .v { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border: 0; border-radius: 7px; background: none; color: var(--fg-2); font-size: 13px; line-height: 1.2; text-decoration: none; cursor: pointer; white-space: nowrap; }
+.views .v:hover { background: rgba(124,196,255,.08); color: #fff; }
+.views .v[aria-current="page"] { background: rgba(124,196,255,.18); color: #fff; box-shadow: inset 0 0 0 1px var(--accent); }
+.views .v svg { flex: none; }
+.views .v small { color: var(--accent); font-size: 12px; max-width: 7em; overflow: hidden; text-overflow: ellipsis; }
 .back { display: inline-flex; align-items: center; gap: 6px; background: rgba(124,196,255,.14); border: 1px solid var(--accent); color: #fff; border-radius: 8px; padding: 6px 12px; font-size: 12.5px; cursor: pointer; }
 .brand .dname { font-family: var(--f-display); font-size: 19px; color: var(--c); white-space: nowrap; }
 .enter { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; margin-top: 14px; padding: 11px 14px; border-radius: 9px; border: 1px solid var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); color: #fff; cursor: pointer; font-size: 14px; font-weight: 700; text-align: left; }
@@ -274,6 +281,11 @@ button { font: inherit; color: inherit; }
     <button class="icon-btn" id="treeBtn" aria-controls="tree" aria-expanded="false">层级</button>
     <button class="back" id="backBtn" data-go="exit" hidden>← 返回全局</button>
     <div class="brand"><h1>知识脉络图</h1><span class="dname" id="brandDom" hidden></span><span class="sub" id="brandSub">1760 — 2026</span></div>
+    <nav class="views" aria-label="切换视图">
+      <button class="v" id="viewGlobal" aria-current="page"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 13V5M5.5 13V2M9 13V6M12.5 13V3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>全局 3D</button>
+      <button class="v" id="viewDomain"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 2v10M5.5 2v10M9 2v10M12.5 2v10" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 1.6"/></svg>领域泳道<small id="viewDomName"></small></button>
+      <a class="v" id="viewGraph" href="graph.html" target="_self"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 2M3 3l2 8M11 5l-6 6M11 5l1 6" stroke="currentColor" stroke-width="1"/><circle cx="3" cy="3" r="2" fill="currentColor"/><circle cx="11" cy="5" r="1.6" fill="currentColor"/><circle cx="5" cy="11" r="1.6" fill="currentColor"/><circle cx="12" cy="11" r="1.2" fill="currentColor"/></svg>知识图谱</a>
+    </nav>
     <div class="search">
       <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5.5" fill="none" stroke="#56618a" stroke-width="1.6"/><path d="M11 11l4 4" stroke="#56618a" stroke-width="1.6" stroke-linecap="round"/></svg>
       <input id="q" type="search" placeholder="搜索节点、人物、书籍、事件" autocomplete="off" aria-label="搜索">
@@ -285,7 +297,6 @@ button { font: inherit; color: inherit; }
     <div class="seg" role="group" aria-label="标注密度">
       <button id="mKey" aria-pressed="true">仅关键点</button><button id="mAll" aria-pressed="false">全部标注</button>
     </div>
-    <a class="seg" id="toGraph" href="graph.html" style="padding:5px 12px;color:var(--accent);text-decoration:none;font-size:13px">图谱视图 ↗</a>
     <div class="legend" id="legend" aria-label="连线类型筛选"></div>
   </header>
 
@@ -813,6 +824,7 @@ const linkRow = (l, from) => {
 
 function renderPanel() {
   const s = S.sel;
+  updateViews();
   if (S.layer === 'domain') {
     if (!s) return renderDomainView(S.dom);
     if (s.type === 'item') return renderItem(itemById[s.id]);
@@ -1209,6 +1221,7 @@ function enterDomain(d) {
   camera.position.copy(v.p.clone().sub(v.t).multiplyScalar(1.7).add(v.t)); controls.target.copy(v.t);
   refresh(); renderPanel(); panel.scrollTop = 0;
   flyView('3d');
+  S.lastDom = d; updateViews(); setHash('#d-' + d);
 }
 
 function exitDomain(silent) {
@@ -1219,10 +1232,38 @@ function exitDomain(silent) {
   $('backBtn').hidden = true; $('brandDom').hidden = true;
   $('brandSub').textContent = `${Y0} — 今 · ${A.cats.length} 大类 · ${A.cats.reduce((s, c) => s + c.subs.length, 0)} 小类 · ${Object.keys(D).length} 领域`;
   $('hud').textContent = '拖拽旋转 · 右键平移 · 滚轮缩放 · 点击查看详情 · 双击光柱进入领域视图';
+  updateViews(); setHash('#global');
   if (silent) return;
   flyView('3d');
   select({ type: 'domain', id: d }, false);
 }
+
+// 视图切换：全局 3D / 领域泳道 / 知识图谱（另一页）。当前领域写进地址的 #，图谱页可以直接跳回来
+function updateViews() {
+  const inDom = S.layer === 'domain';
+  $('viewGlobal').toggleAttribute('aria-current', !inDom); if (!inDom) $('viewGlobal').setAttribute('aria-current', 'page');
+  $('viewDomain').toggleAttribute('aria-current', inDom); if (inDom) $('viewDomain').setAttribute('aria-current', 'page');
+  const d = inDom ? S.dom : pickDomain();
+  $('viewDomName').textContent = d ? '· ' + D[d].name : '';
+  $('viewDomain').title = d ? '进入「' + D[d].name + '」的领域泳道' : '';
+}
+function setHash(h) { try { if (location.hash !== h) history.replaceState(null, '', h); } catch (e) { /* 预览环境可能不允许 */ } }
+// 领域泳道按钮进入哪个领域：当前选中的领域 > 上次进入的 > 第一个有细节的
+function pickDomain() {
+  if (S.sel && S.sel.type === 'domain') return S.sel.id;
+  if (S.sel && S.sel.type === 'node') { const n = A.nodes.find(x => x.id === S.sel.id); if (n) return n.d; }
+  return S.lastDom || Object.keys(DETAIL)[0] || Object.keys(D)[0];
+}
+$('viewGlobal').addEventListener('click', () => { if (S.layer === 'domain') exitDomain(); });
+$('viewDomain').addEventListener('click', () => { const d = pickDomain(); if (S.layer !== 'domain' || S.dom !== d) enterDomain(d); });
+const START_HASH = location.hash;
+function routeFromHash(h) {
+  h = typeof h === 'string' ? h : location.hash;
+  const m = /^#d-([\w-]+)$/.exec(h);
+  if (m && D[m[1]]) { if (S.dom !== m[1]) enterDomain(m[1]); }
+  else if (h === '#global' && S.layer === 'domain') exitDomain();
+}
+window.addEventListener('hashchange', routeFromHash);
 
 function go(type, id) {
   if (type === 'enter') return enterDomain(id);
@@ -1363,6 +1404,7 @@ document.addEventListener('keydown', ev => {
 // ---------- 启动 ----------
 $('loading').remove();
 refresh(); renderPanel();
+updateViews(); routeFromHash(START_HASH);
 requestAnimationFrame(frame);
 })();
 </script>

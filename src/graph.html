@@ -56,7 +56,14 @@ button, input { font: inherit; color: inherit; }
 .seg button + button { border-left: 1px solid var(--line-2); }
 .seg button[aria-pressed="true"] { background: #16213f; color: var(--fg); }
 .seg-label { font-size: 12px; color: var(--muted); margin-right: -4px; }
-.to3d { margin-left: auto; color: var(--accent); text-decoration: none; font-size: 13px; border: 1px solid var(--line-2); padding: 5px 12px; border-radius: 8px; white-space: nowrap; }
+/* 视图切换：与 3D 页面相同，常驻顶栏 */
+.views { display: inline-flex; gap: 3px; padding: 3px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--bg); flex: none; }
+.views .v { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 7px; color: var(--fg-2); font-size: 13px; line-height: 1.2; text-decoration: none; white-space: nowrap; }
+.views .v:hover { background: rgba(124,196,255,.08); color: #fff; }
+.views .v[aria-current="page"] { background: rgba(124,196,255,.18); color: #fff; box-shadow: inset 0 0 0 1px var(--accent); }
+.views .v small { color: var(--accent); font-size: 12px; max-width: 7em; overflow: hidden; text-overflow: ellipsis; }
+.enter { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 4px 0 14px; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--c); background: none; color: var(--fg); text-decoration: none; font-size: 13.5px; }
+.enter:hover { background: #0e1530; }
 .menu { display: none; }
 
 .side { grid-area: side; border-right: 1px solid var(--line); overflow: auto; padding: 14px 14px 24px; display: flex; flex-direction: column; gap: 18px; background: var(--bg); }
@@ -120,7 +127,6 @@ button.chip:hover { border-color: var(--c, var(--accent)); }
   .side.open { transform: none; box-shadow: 0 0 40px #000; }
   .menu { display: inline-flex; }
   .panel { border-left: 0; border-top: 1px solid var(--line); max-height: 40vh; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
-  .to3d { margin-left: 0; }
   .seg-label { display: none; }
   .legend-note { display: none; }
 }
@@ -132,6 +138,11 @@ button.chip:hover { border-color: var(--c, var(--accent)); }
   <header class="top">
     <button class="btn menu" id="menuBtn" aria-controls="side" aria-expanded="false">筛选</button>
     <div class="brand">知识脉络图谱<small id="brandStat"></small></div>
+    <nav class="views" aria-label="切换视图">
+      <a class="v" href="index.html#global" target="_self"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 13V5M5.5 13V2M9 13V6M12.5 13V3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>全局 3D</a>
+      <a class="v" id="viewDomain" href="index.html#d-ai" target="_self"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 2v10M5.5 2v10M9 2v10M12.5 2v10" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 1.6"/></svg>领域泳道<small id="viewDomName"></small></a>
+      <a class="v" aria-current="page" href="graph.html" target="_self"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 2M3 3l2 8M11 5l-6 6M11 5l1 6" stroke="currentColor" stroke-width="1"/><circle cx="3" cy="3" r="2" fill="currentColor"/><circle cx="11" cy="5" r="1.6" fill="currentColor"/><circle cx="5" cy="11" r="1.6" fill="currentColor"/><circle cx="12" cy="11" r="1.2" fill="currentColor"/></svg>知识图谱</a>
+    </nav>
     <div class="search">
       <input id="q" type="search" placeholder="搜索条目、人物、书、领域" autocomplete="off" aria-label="搜索">
       <div class="results" id="results" hidden></div>
@@ -147,7 +158,6 @@ button.chip:hover { border-color: var(--c, var(--accent)); }
       <button data-depth="1" aria-pressed="false">1 步</button>
       <button data-depth="2" aria-pressed="false">2 步</button>
     </div>
-    <a class="to3d" href="index.html">3D 视图 ↗</a>
   </header>
 
   <aside class="side" id="side">
@@ -484,9 +494,20 @@ function neighborsHtml(id) {
     `<div class="sec"><h4>${kindName(k)}<span>${list.length}</span></h4>${list.sort((a, b) => (a.e.y || 0) - (b.e.y || 0)).map(rowOf).join('')}</div>`).join('');
 }
 
+// 顶栏“领域泳道”跳到当前选中条目所在的领域
+let lastDom = Object.keys(window.ATLAS_DETAIL || {})[0] || Object.keys(G.domains)[0];
+function updateDomainLink(n) {
+  const d = n && (n.type === 'domain' ? n.d : n.e && n.e.d[0]);
+  if (d) lastDom = d;
+  $('viewDomain').href = 'index.html#d-' + lastDom;
+  $('viewDomName').textContent = '· ' + G.domains[lastDom].name;
+}
+const enterBtn = d => `<a class="enter" href="index.html#d-${d}" target="_self" style="--c:${domColor[d]}"><span>在「${esc(G.domains[d].name)}」的领域泳道中查看</span><span>↗</span></a>`;
+
 function render() {
   const P = $('panel');
   const n = S.sel && byId.get(S.sel);
+  updateDomainLink(n);
   if (!n) return renderOverview(P);
   if (n.type !== 'entry') return renderHub(P, n);
   const e = n.e;
@@ -498,6 +519,7 @@ function render() {
   h += '</div>';
   if (e.stub) h += `<div class="stubnote">这个条目在 ${n.deg} 处被提到，还没有说明。补上之后，它会把这些地方连成一个枢纽。</div>`;
   if (e.x) h += `<p class="body">${esc(e.x)}</p>`;
+  if (e.d[0] && e.k !== 'link' && !e.stub) h += enterBtn(e.d[0]);
   if (e.sides) h += `<div class="sides"><div style="--c:#f9a8d4">${esc(e.sides[0])}</div><div style="--c:#7dd3fc">${esc(e.sides[1])}</div></div>`;
   if (e.k === 'link') h += `<div class="three">${[['背景', e.bg], ['经过', e.what], ['后果', e.out]].filter(x => x[1]).map(([a, b]) => `<div><b>${a}</b><p>${esc(b)}</p></div>`).join('')}</div>`;
   if (e.e && e.e.length) h += `<div class="sec"><h4>相关事件<span>${e.e.length}</span></h4>${e.e.map(x => `<div class="row" style="cursor:default"><span class="y"></span><span class="tt">${esc(x)}</span><span></span></div>`).join('')}</div>`;
@@ -514,6 +536,7 @@ function renderHub(P, n) {
     const dm = G.domains[n.d], tpl = G.templates[dm.template];
     h += `<div class="meta"><span class="chip">${esc(tpl.name || tpl.id)}模板</span><span class="chip">${esc(packName(dm.pack))}</span></div>`;
     if (dm.desc) h += `<p class="body">${esc(dm.desc)}</p>`;
+    h += enterBtn(n.d);
     if (dm.pre) h += `<p class="body" style="font-size:13px;color:var(--muted)">${esc(dm.pre)}</p>`;
     if (dm.stages) h += `<div class="sec"><h4>阶段<span>${dm.stages.length}</span></h4>${dm.stages.map(s => `<div class="row" style="cursor:default"><span class="y">${s[0]}</span><span class="tt">${esc(s[2])}<small>至 ${s[1]}</small></span><span class="rt">${'●'.repeat(s[3])}</span></div>`).join('')}</div>`;
     h += `<div class="sec"><h4>泳道<span>${tpl.lanes.length}</span></h4><div class="meta">${tpl.lanes.map(k => `<span class="chip" style="--c:${kindColor(k)}"><span class="dot"></span>${esc(kindName(k))}</span>`).join('')}</div></div>`;
